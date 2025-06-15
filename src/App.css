@@ -1,0 +1,152 @@
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+a {
+  font-weight: 500;
+  color: #007bff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #0056b3;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: 0.5rem;
+}
+
+input,
+button {
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  padding: 0.5em 1em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  color: #0f0f0f;
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+button {
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+button:hover {
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+button:active {
+  background-color: #0062cc;
+  border-color: #005cbf;
+}
+
+button:disabled {
+  background-color: #ccc;
+  border-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+input:focus,
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 暗黑模式支持 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+    background-color: #1a1a1a;
+  }
+
+  input,
+  button {
+    color: #ffffff;
+    background-color: #333;
+    border-color: #444;
+  }
+
+  button {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  button:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+  }
+
+  button:active {
+    background-color: #0a58ca;
+    border-color: #0a53be;
+  }
+
+  button:disabled {
+    background-color: #444;
+    border-color: #555;
+    color: #aaa;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #333;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #666;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #888;
+  }
+}
