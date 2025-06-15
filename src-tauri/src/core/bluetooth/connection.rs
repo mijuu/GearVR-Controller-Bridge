@@ -98,7 +98,7 @@ impl ConnectionManager {
             info!("Device already connected, disconnecting first...");
             peripheral.disconnect().await?;
             info!("Waiting after disconnect...");
-            tokio::time::sleep(Duration::from_millis(2000)).await;
+            tokio::time::sleep(Duration::from_millis(5000)).await;
         }
 
         // Connect to the device
@@ -116,7 +116,7 @@ impl ConnectionManager {
 
         // Wait for connection to stabilize
         info!("Waiting for connection to stabilize...");
-        tokio::time::sleep(Duration::from_millis(2000)).await;
+        tokio::time::sleep(Duration::from_millis(5000)).await;
 
         // Verify connection status
         if !peripheral.is_connected().await? {
@@ -176,16 +176,16 @@ impl ConnectionManager {
         let command_sender = PeripheralCommandSender::new(peripheral.clone(), write_char.clone());
         let command_executor = CommandExecutor::new(command_sender);
 
-        // Initialize controller
-        info!("Initializing controller...");
-        match command_executor.initialize_controller().await {
-            Ok(_) => info!("Controller initialized successfully"),
+        // Initialize controller in sensor mode (default)
+        info!("Initializing controller in sensor mode...");
+        match command_executor.initialize_controller(false).await {
+            Ok(_) => info!("Controller initialized successfully in sensor mode"),
             Err(e) => {
                 warn!("Controller initialization failed: {}", e);
                 // If initialization fails, wait and try again
                 tokio::time::sleep(Duration::from_millis(1000)).await;
-                info!("Retrying controller initialization...");
-                command_executor.initialize_controller().await?;
+                info!("Retrying controller initialization in sensor mode...");
+                command_executor.initialize_controller(false).await?;
             }
         }
 

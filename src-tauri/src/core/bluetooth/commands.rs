@@ -13,12 +13,20 @@ pub enum ControllerCommand {
     Off,
     /// Enable sensor mode (0x01, 0x00)
     Sensor,
-    /// Enable VR mode (0x02, 0x00)
-    VrMode,
+    /// Firmware update function (0x02, 0x00)
+    FirmwareUpdate,
     /// Calibrate the controller (0x03, 0x00)
     Calibrate,
     /// Keep-alive signal (0x04, 0x00)
     KeepAlive,
+    /// Unknown setting (0x05, 0x00)
+    UnknownSetting,
+    /// Enable LPM mode (0x06, 0x00)
+    LpmEnable,
+    /// Disable LPM mode (0x07, 0x00)
+    LpmDisable,
+    /// Enable VR mode (0x08, 0x00)
+    VrMode,
 }
 
 impl ControllerCommand {
@@ -27,9 +35,13 @@ impl ControllerCommand {
         match self {
             Self::Off => vec![0x00, 0x00],
             Self::Sensor => vec![0x01, 0x00],
-            Self::VrMode => vec![0x02, 0x00],
+            Self::FirmwareUpdate => vec![0x02, 0x00],
             Self::Calibrate => vec![0x03, 0x00],
             Self::KeepAlive => vec![0x04, 0x00],
+            Self::UnknownSetting => vec![0x05, 0x00],
+            Self::LpmEnable => vec![0x06, 0x00],
+            Self::LpmDisable => vec![0x07, 0x00],
+            Self::VrMode => vec![0x08, 0x00],
         }
     }
 }
@@ -52,30 +64,22 @@ impl<T: CommandSender> CommandExecutor<T> {
         Self { command_sender }
     }
 
-    /// Initialize the controller with the required command sequence
-    pub async fn initialize_controller(&self) -> Result<()> {
-        // First send OFF command to reset controller state
-        info!("Sending OFF command to reset controller state");
-        self.command_sender.send_command(ControllerCommand::Off).await?;
-        sleep(Duration::from_millis(500)).await;
+    /// Initialize the controller with sensor mode or VR mode
+    pub async fn initialize_controller(&self, vr_mode: bool) -> Result<()> {
+        // Send the appropriate mode command
+        let command = if vr_mode {
+            info!("Setting VR Mode");
+            ControllerCommand::VrMode
+        } else {
+            info!("Setting Sensor Mode");
+            ControllerCommand::Sensor
+        };
 
-        // Initialize command sequence
-        let init_commands = [
-            ControllerCommand::Sensor,
-            ControllerCommand::VrMode,
-            ControllerCommand::KeepAlive,
-        ];
-
-        // Send initialization commands
-        for cmd in &init_commands {
-            info!("Sending command: {:?}", cmd);
-            self.command_sender.send_command(*cmd).await?;
-            sleep(Duration::from_millis(500)).await;
-        }
-
-        // Wait for commands to take effect
-        sleep(Duration::from_millis(1000)).await;
-        info!("Controller initialized");
+        self.command_sender.send_command(command).await?;
+        
+        // Wait for command to take effect
+        sleep(Duration::from_millis(5000)).await;
+        info!("Controller initialized in {} mode", if vr_mode { "VR" } else { "Sensor" });
 
         Ok(())
     }

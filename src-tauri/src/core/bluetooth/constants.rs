@@ -19,7 +19,7 @@ pub const UUID_MODEL_NUMBER: Uuid = Uuid::from_u128(0x00002a24_0000_1000_8000_00
 pub const UUID_BATTERY_LEVEL: Uuid = Uuid::from_u128(0x00002a19_0000_1000_8000_00805f9b34fb);
 
 /// The UUID of the GearVR Controller service (Oculus Threemote)
-pub const UUID_CONTROLLER_SERVICE: Uuid = Uuid::from_u128(0x4f63756c_7573_2054_6872_6565666f7465);
+pub const UUID_CONTROLLER_SERVICE: Uuid = Uuid::from_u128(0x4f63756c_7573_2054_6872_65656d6f7465);
 
 /// The UUID of the GearVR Controller notification characteristic
 pub const UUID_CONTROLLER_NOTIFY_CHAR: Uuid = Uuid::from_u128(0xc8c51726_81bc_483b_a052_f7a14ea3d281);
