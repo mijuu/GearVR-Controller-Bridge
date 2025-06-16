@@ -21,6 +21,8 @@ const DeviceList: React.FC = () => {
     try {
       setIsScanning(true);
       setError(null);
+      // 清空设备列表
+      setDevices([]);
       const foundDevices = await invoke<BluetoothDevice[]>('scan_devices', {
         durationSecs: 5,
       });

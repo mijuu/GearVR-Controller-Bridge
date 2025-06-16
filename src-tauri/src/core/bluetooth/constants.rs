@@ -47,3 +47,8 @@ pub const CONTROLLER_COMMAND_PACKET_SIZE: usize = 20;
 
 /// Controller keep-alive interval in seconds
 pub const CONTROLLER_KEEPALIVE_INTERVAL_SECS: u64 = 5;
+
+/// Minimum RSSI threshold for device scanning (in dBm)
+/// Only devices with RSSI values greater than this will be included in scan results
+/// -70 dBm is considered medium signal strength
+pub const MIN_RSSI_THRESHOLD: i16 = -70;

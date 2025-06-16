@@ -24,6 +24,7 @@ use crate::core::bluetooth::constants::{
     UUID_CONTROLLER_WRITE_CHAR,
     UUID_BATTERY_SERVICE,
     UUID_BATTERY_LEVEL,
+    MIN_RSSI_THRESHOLD,
 };
 use crate::core::controller::ControllerParser;
 
@@ -103,21 +104,31 @@ impl BluetoothManager {
                 
                 // Print all discovered devices for debugging
                 info!("Found device - Address: {}, ID: {}, Name: {:?}, RSSI: {:?}", address, id, name, rssi);
-                
-                // Create device object
-                let device = BluetoothDevice::new(name.clone(), address.clone(), id.clone(), rssi);
-                
-                // Only include Gear VR Controllers
-                if device.is_gear_vr_controller(CONTROLLER_NAME) {
-                    info!("Including Gear VR Controller device: {:?}", name);
-                    
-                    // Store peripheral for later connection using ID as key
-                    self.peripherals
-                        .lock()
-                        .unwrap()
-                        .insert(id.clone(), peripheral);
 
-                    devices.push(device);
+                // Only include devices with medium or stronger signal strength
+                if let Some(signal_strength) = rssi {
+                    if signal_strength >= MIN_RSSI_THRESHOLD {
+                        info!("Including device with sufficient signal strength (RSSI: {})", signal_strength);
+                        
+                        // Create device object
+                        let device = BluetoothDevice::new(name.clone(), address.clone(), id.clone(), rssi);
+                        
+                        if device.is_gear_vr_controller(CONTROLLER_NAME) {
+                            info!("Including Gear VR Controller device: {:?}", name);
+
+                            // Store peripheral for later connection using ID as key
+                            self.peripherals
+                                .lock()
+                                .unwrap()
+                                .insert(id.clone(), peripheral);
+
+                            devices.push(device);
+                        }
+                    } else {
+                        info!("Skipping device with weak signal (RSSI: {})", signal_strength);
+                    }
+                } else {
+                    info!("Skipping device with unknown signal strength");
                 }
             }
         }
