@@ -4,9 +4,11 @@ import { listen } from '@tauri-apps/api/event';
 interface StatusBarProps {
   isConnected: boolean;
   deviceName?: string;
+  showLogs: boolean;
+  setShowLogs: (show: boolean) => void;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs }) => {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [lastDataReceived, setLastDataReceived] = useState<Date | null>(null);
 
@@ -53,39 +55,61 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName }) => {
 
   return (
     <div className="status-bar">
-      <div className="connection-status">
-        <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
-        <span>
-          {isConnected
-            ? `已连接: ${deviceName || '未知设备'}`
-            : '未连接'}
-        </span>
+      <div className="status-left">
+        <div className="connection-status">
+          <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
+          <span>
+            {isConnected
+              ? `已连接: ${deviceName || '未知设备'}`
+              : '未连接'}
+          </span>
+        </div>
+        
+        {isConnected && (
+          <>
+            <div className="battery-status">
+              <span className="status-label">电池:</span>
+              <span className="status-value">
+                {batteryLevel !== null ? `${batteryLevel}%` : '未知'}
+              </span>
+            </div>
+            
+            <div className="data-status">
+              <span className="status-label">最后数据:</span>
+              <span className="status-value">{formatLastReceived()}</span>
+            </div>
+          </>
+        )}
       </div>
       
-      {isConnected && (
-        <>
-          <div className="battery-status">
-            <span className="status-label">电池:</span>
-            <span className="status-value">
-              {batteryLevel !== null ? `${batteryLevel}%` : '未知'}
-            </span>
-          </div>
-          
-          <div className="data-status">
-            <span className="status-label">最后数据:</span>
-            <span className="status-value">{formatLastReceived()}</span>
-          </div>
-        </>
-      )}
+      <div className="status-right">
+        <div 
+          className="log-toggle-link" 
+          onClick={() => setShowLogs(!showLogs)}
+        >
+          {showLogs ? '隐藏日志' : '显示日志'}
+        </div>
+      </div>
 
       <style>{`
         .status-bar {
           display: flex;
           align-items: center;
+          justify-content: space-between;
           padding: 0.5rem 1rem;
           background-color: #f8f9fa;
           border-top: 1px solid #ddd;
           font-size: 0.9rem;
+        }
+
+        .status-left {
+          display: flex;
+          align-items: center;
+        }
+
+        .status-right {
+          display: flex;
+          align-items: center;
         }
 
         .connection-status {
@@ -121,6 +145,19 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName }) => {
 
         .status-value {
           font-weight: 500;
+        }
+
+        .log-toggle-link {
+          color: #0275d8;
+          cursor: pointer;
+          font-size: 0.9rem;
+          transition: color 0.2s;
+          user-select: none;
+        }
+
+        .log-toggle-link:hover {
+          color: #014c8c;
+          text-decoration: underline;
         }
       `}</style>
     </div>
