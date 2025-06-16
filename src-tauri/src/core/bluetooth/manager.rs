@@ -94,6 +94,7 @@ impl BluetoothManager {
         for peripheral in peripherals {
             let properties = peripheral.properties().await?;
             let address = peripheral.address().to_string();
+            let id = peripheral.id().to_string();
 
             // Only include devices with names and filter for Gear VR Controller
             if let Some(properties) = properties {
@@ -101,20 +102,20 @@ impl BluetoothManager {
                 let rssi = properties.rssi;
                 
                 // Print all discovered devices for debugging
-                info!("Found device - Address: {}, Name: {:?}, RSSI: {:?}", address, name, rssi);
+                info!("Found device - Address: {}, ID: {}, Name: {:?}, RSSI: {:?}", address, id, name, rssi);
                 
                 // Create device object
-                let device = BluetoothDevice::new(name.clone(), address.clone(), rssi);
+                let device = BluetoothDevice::new(name.clone(), address.clone(), id.clone(), rssi);
                 
                 // Only include Gear VR Controllers
                 if device.is_gear_vr_controller(CONTROLLER_NAME) {
                     info!("Including Gear VR Controller device: {:?}", name);
                     
-                    // Store peripheral for later connection
+                    // Store peripheral for later connection using ID as key
                     self.peripherals
                         .lock()
                         .unwrap()
-                        .insert(address.clone(), peripheral);
+                        .insert(id.clone(), peripheral);
 
                     devices.push(device);
                 }
@@ -124,17 +125,17 @@ impl BluetoothManager {
         Ok(devices)
     }
 
-    /// Connects to a device with the given address
-    pub async fn connect_device(&self, address: &str, window: Window) -> Result<()> {
+    /// Connects to a device with the given ID
+    pub async fn connect_device(&self, device_id: &str, window: Window) -> Result<()> {
         let peripheral = {
             let peripherals = self.peripherals.lock().unwrap();
             peripherals
-                .get(address)
+                .get(device_id)
                 .cloned()
-                .ok_or_else(|| anyhow!("Device not found: {}", address))?
+                .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
         };
 
-        info!("Connecting to device: {}", address);
+        info!("Connecting to device with ID: {}", device_id);
         
         // Connect to the device with retry mechanism
         let result = self.connection_manager.connect_with_retry(

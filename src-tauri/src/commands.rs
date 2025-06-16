@@ -39,12 +39,12 @@ pub async fn scan_devices(
 /// Connects to a Bluetooth device
 ///
 /// # Arguments
-/// * `address` - The address of the device to connect to
+/// * `device_id` - The unique identifier of the device to connect to (platform-specific ID)
 /// * `window` - The Tauri window
 /// * `state` - The application state
 #[tauri::command]
 pub async fn connect_to_device(
-    address: String,
+    device_id: String,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -54,7 +54,7 @@ pub async fn connect_to_device(
         guard.as_ref().unwrap().clone()
     };
     
-    bluetooth_manager.connect_device(&address, window).await.map_err(|e| e.to_string())
+    bluetooth_manager.connect_device(&device_id, window).await.map_err(|e| e.to_string())
 }
 
 /// Disconnects from the currently connected device

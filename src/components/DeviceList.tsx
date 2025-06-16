@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 interface BluetoothDevice {
   name?: string;
   address: string;
+  id: string;
   rssi?: number;
 }
 
@@ -32,11 +33,11 @@ const DeviceList: React.FC = () => {
   };
 
   // 连接设备
-  const connectToDevice = async (address: string) => {
+  const connectToDevice = async (deviceId: string) => {
     try {
       setError(null);
-      await invoke('connect_to_device', { address });
-      setSelectedDevice(address);
+      await invoke('connect_to_device', { deviceId });
+      setSelectedDevice(deviceId);
     } catch (err) {
       setError(`连接失败: ${err}`);
     }
@@ -78,28 +79,36 @@ const DeviceList: React.FC = () => {
       <div className="devices">
         {devices.map((device) => (
           <div
-            key={device.address}
+            key={device.id}
             className={`device-item ${
-              selectedDevice === device.address ? 'selected' : ''
+              selectedDevice === device.id ? 'selected' : ''
             }`}
           >
             <div className="device-info">
               <div className="device-name">
                 {device.name || '未知设备'}
               </div>
-              <div className="device-address">{device.address}</div>
+              <div className="device-address">
+                MAC: {device.address}
+                {device.address === '00:00:00:00:00:00' && (
+                  <span className="device-id">
+                    <br />
+                    ID: {device.id}
+                  </span>
+                )}
+              </div>
               <div className="signal-strength">
                 信号: {renderSignalStrength(device.rssi)}
               </div>
             </div>
             <div className="device-actions">
-              {selectedDevice === device.address ? (
+              {selectedDevice === device.id ? (
                 <button onClick={disconnect} className="disconnect-button">
                   断开连接
                 </button>
               ) : (
                 <button
-                  onClick={() => connectToDevice(device.address)}
+                  onClick={() => connectToDevice(device.id)}
                   className="connect-button"
                 >
                   连接
