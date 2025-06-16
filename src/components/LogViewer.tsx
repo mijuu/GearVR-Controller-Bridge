@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface LogMessage {
   level: string;
@@ -36,17 +36,14 @@ const formatTimestamp = (timestamp: string): string => {
 };
 
 function LogViewer({ logs, onClearLogs }: LogViewerProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
   const logContentRef = useRef<HTMLDivElement>(null);
-  
-  // 移除调试代码
 
   // 自动滚动到底部
   useEffect(() => {
-    if (logContentRef.current && isExpanded) {
+    if (logContentRef.current) {
       logContentRef.current.scrollTop = logContentRef.current.scrollHeight;
     }
-  }, [logs, isExpanded]);
+  }, [logs]);
 
   const getLevelColor = (level: string) => {
     switch (level.toLowerCase()) {
@@ -68,9 +65,8 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
   return (
     <div className="log-viewer" style={{ marginTop: '10px' }}>
       <div className="log-header">
-        <div className="log-title" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="log-title">
           <span>日志查看器 {logs.length > 0 ? `(${logs.length})` : ''}</span>
-          <span className="expand-icon">{isExpanded ? '▼' : '▶'}</span>
         </div>
         <button 
           onClick={onClearLogs} 
@@ -81,7 +77,7 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
         </button>
       </div>
       <div 
-        className={`log-content ${isExpanded ? 'expanded' : 'collapsed'}`} 
+        className="log-content" 
         ref={logContentRef}
       >
         <div className="log-entries">
@@ -117,6 +113,7 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
           display: flex;
           flex-direction: column;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+          height: 100%;
         }
 
         .log-header {
@@ -133,13 +130,7 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
           display: flex;
           align-items: center;
           gap: 8px;
-          cursor: pointer;
           font-weight: 500;
-        }
-
-        .expand-icon {
-          font-size: 0.8rem;
-          transition: transform 0.2s;
         }
 
         .log-content {
@@ -149,15 +140,16 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
           font-size: 0.85rem;
           color: #333;
           background-color: #fff;
-          max-height: 250px;
+          flex: 1;
+          height: 100%;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
         }
-        
-        .log-content.expanded {
-          display: block;
-        }
-        
-        .log-content.collapsed {
-          display: none;
+
+        .log-entries {
+          flex: 1;
+          overflow-y: auto;
         }
 
         .clear-logs-button {

@@ -115,10 +115,8 @@ function App() {
       <main className="app-content">
         <DeviceList />
         {showLogs && (
-          <div className="log-section">
-            <div className="log-viewer-container">
-              <LogViewer logs={logs} onClearLogs={clearLogs} />
-            </div>
+          <div className="log-overlay">
+            <LogViewer logs={logs} onClearLogs={clearLogs} />
           </div>
         )}
       </main>
@@ -172,15 +170,65 @@ function App() {
           background-color: white;
         }
 
-        .log-section {
-          margin-top: 1rem;
-          border-top: 1px solid #ddd;
-          padding-top: 1rem;
+        .log-overlay {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 40px; /* StatusBar的高度，确保不会遮挡到它 */
+          top: 250px; /* 留出顶部空间显示设备列表第一项 */
+          background-color: rgba(245, 245, 245, 0.98);
+          backdrop-filter: blur(5px);
+          z-index: 1000;
+          padding: 0 1rem;
+          display: flex;
+          flex-direction: column;
+          pointer-events: all;
+          transition: all 0.3s ease;
+          box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+          border-top: 1px solid rgba(0, 0, 0, 0.1);
+          animation: slideIn 0.3s ease;
         }
 
-        .log-viewer-container {
-          transition: opacity 0.3s, max-height 0.3s;
-          overflow: hidden;
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .log-overlay .log-viewer {
+          flex: 1;
+          max-height: none !important;
+          margin: 0 !important;
+          height: 100%;
+        }
+
+        .log-overlay .log-content {
+          max-height: none !important;
+          height: calc(100% - 40px) !important;
+        }
+
+        /* 响应式调整 */
+        @media (max-height: 600px) {
+          .log-overlay {
+            top: 100px; /* 在小屏幕上减少顶部空间 */
+          }
+        }
+
+        @media (max-height: 500px) {
+          .log-overlay {
+            top: 80px; /* 在更小的屏幕上进一步减少顶部空间 */
+          }
+        }
+
+        @media (max-width: 768px) {
+          .log-overlay {
+            padding: 0 0.5rem; /* 在窄屏幕上减少水平内边距 */
+          }
         }
       `}</style>
     </div>
