@@ -1,40 +1,8 @@
 //! Tauri commands
 //! This module defines all the commands that can be invoked from the frontend.
 
-use crate::core::bluetooth::BluetoothDevice;
 use crate::state::AppState;
-use tauri::{State, Window};
-
-/// Scans for Bluetooth devices
-///
-/// # Arguments
-/// * `duration_secs` - The duration of the scan in seconds
-/// * `state` - The application state
-///
-/// # Returns
-/// A list of discovered Bluetooth devices
-#[tauri::command]
-pub async fn scan_devices(
-    duration_secs: Option<u64>,
-    state: State<'_, AppState>,
-) -> Result<Vec<BluetoothDevice>, String> {
-    // Default scan duration is 5 seconds
-    let duration = duration_secs.unwrap_or(5);
-    
-    // Initialize Bluetooth if not already initialized
-    if state.bluetooth().is_err() {
-        state.init_bluetooth().await.map_err(|e| e.to_string())?;
-    }
-    
-    // Perform the scan
-    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
-    let bluetooth_manager = {
-        let guard = state.bluetooth().map_err(|e| e.to_string())?;
-        guard.as_ref().unwrap().clone()
-    };
-    
-    bluetooth_manager.scan_devices(duration).await.map_err(|e| e.to_string())
-}
+use tauri::{Window, Emitter, State};
 
 /// Connects to a Bluetooth device
 ///
@@ -55,6 +23,47 @@ pub async fn connect_to_device(
     };
     
     bluetooth_manager.connect_device(&device_id, window).await.map_err(|e| e.to_string())
+}
+
+/// Scans for Bluetooth devices with real-time updates through events
+///
+/// # Arguments
+/// * `window` - The Tauri window
+/// * `duration_secs` - The duration of the scan in seconds
+/// * `state` - The application state
+///
+/// # Returns
+/// Nothing, but emits events during scanning:
+/// - "scan-start" when scanning is started
+/// - "device-found" with device details when a device is discovered
+/// - "scan-complete" when scanning is finished
+#[tauri::command]
+pub async fn scan_devices_realtime(
+    window: Window,
+    duration_secs: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Default scan duration is 5 seconds
+    let duration = duration_secs.unwrap_or(5);
+    
+    // Initialize Bluetooth if not already initialized
+    if state.bluetooth().is_err() {
+        state.init_bluetooth().await.map_err(|e| e.to_string())?;
+    }
+    
+    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
+    let bluetooth_manager = {
+        let guard = state.bluetooth().map_err(|e| e.to_string())?;
+        guard.as_ref().unwrap().clone()
+    };
+    
+    // Emit scan-start event
+    if let Err(e) = window.emit("scan-start", ()) {
+        eprintln!("Failed to emit scan-start event: {}", e);
+    }
+    
+    // Perform the real-time scan
+    bluetooth_manager.scan_devices_realtime(window, duration).await.map_err(|e| e.to_string())
 }
 
 /// Disconnects from the currently connected device

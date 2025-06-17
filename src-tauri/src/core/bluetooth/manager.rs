@@ -3,13 +3,17 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Instant, Duration};
 
+use regex::Regex;
 use anyhow::{anyhow, Result};
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
-use btleplug::platform::{Adapter, Manager, Peripheral};
+use btleplug::platform::{Adapter, Manager as BtleplugManager, Peripheral};
+use bluest::Adapter as BlueAdapter;
+use futures_util::StreamExt;
 use log::info;
-use tauri::Window;
+use tokio::time::timeout;
+use tauri::{Window, Emitter};
 
 use crate::core::bluetooth::commands::CommandExecutor;
 use crate::core::bluetooth::connection::{ConnectionManager, PeripheralCommandSender};
@@ -48,7 +52,7 @@ pub struct BluetoothManager {
 impl BluetoothManager {
     /// Creates a new BluetoothManager
     pub async fn new() -> Result<Self> {
-        let manager = Manager::new().await?;
+        let manager = BtleplugManager::new().await?;
         let adapters = manager.adapters().await?;
         let adapter = adapters
             .into_iter()
@@ -71,69 +75,77 @@ impl BluetoothManager {
         })
     }
 
-    /// Scans for Bluetooth devices
-    pub async fn scan_devices(&self, duration_secs: u64) -> Result<Vec<BluetoothDevice>> {
+    fn extract_mac_address(device_id_str: &str) -> Option<String> {
+        let re = Regex::new(r"([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})").unwrap();
+        re.find(device_id_str).map(|mat| mat.as_str().to_string().to_uppercase())
+    }
+    /// Scans for Bluetooth devices using bluest library
+    pub async fn scan_devices_realtime(&self, window: Window, duration_secs: u64) -> Result<()> {
+        let adapter = BlueAdapter::default().await.ok_or_else(|| anyhow!("No Bluetooth adapter found"))?;
+        adapter.wait_available().await?;
+        
         // Clear existing peripherals
         self.peripherals.lock().unwrap().clear();
 
-        // Start scanning
-        info!("Starting Bluetooth scan for {} seconds", duration_secs);
-        self.adapter.start_scan(ScanFilter::default()).await?;
+        info!("Starting bluetooth scan for {} seconds", duration_secs);
+        let mut scan = adapter.scan(&[]).await?;
+        info!("Bluetooth scan started");
 
-        // Wait for the specified duration
-        tokio::time::sleep(Duration::from_secs(duration_secs)).await;
+        // Process discovered peripherals in real-time
+        let start_time = Instant::now();
+        
+        let scan_duration = Duration::from_secs(duration_secs);
+        loop {
+            let remaining_time = scan_duration.saturating_sub(start_time.elapsed());
+            if remaining_time.is_zero() {
+                info!("Scan duration of {} seconds has been reached.", duration_secs);
+                break;
+            }
 
-        // Stop scanning
-        self.adapter.stop_scan().await?;
-        info!("Bluetooth scan completed");
+            match timeout(remaining_time, scan.next()).await {
+                Ok(Some(discovered_device)) => {
+                    let device = discovered_device.device;
+                    let name = discovered_device.adv_data.local_name;
+                    let id = device.id().to_string();
+                    let rssi = discovered_device.rssi;
+                    let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
+                    
+                    // Print all discovered devices for debugging
+                    info!("Found device - Address: {}, ID: {}, Name: {:?}, RSSI: {:?}", 
+                        address, id, name, rssi);
 
-        // Get discovered peripherals
-        let peripherals = self.adapter.peripherals().await?;
-        let mut devices = Vec::new();
-
-        // Process discovered peripherals
-        for peripheral in peripherals {
-            let properties = peripheral.properties().await?;
-            let address = peripheral.address().to_string();
-            let id = peripheral.id().to_string();
-
-            // Only include devices with names and filter for Gear VR Controller
-            if let Some(properties) = properties {
-                let name = properties.local_name.clone();
-                let rssi = properties.rssi;
-                
-                // Print all discovered devices for debugging
-                info!("Found device - Address: {}, ID: {}, Name: {:?}, RSSI: {:?}", address, id, name, rssi);
-
-                // Only include devices with medium or stronger signal strength
-                if let Some(signal_strength) = rssi {
-                    if signal_strength >= MIN_RSSI_THRESHOLD {
-                        info!("Including device with sufficient signal strength (RSSI: {})", signal_strength);
-                        
-                        // Create device object
-                        let device = BluetoothDevice::new(name.clone(), address.clone(), id.clone(), rssi);
-                        
-                        if device.is_gear_vr_controller(CONTROLLER_NAME) {
-                            info!("Including Gear VR Controller device: {:?}", name);
-
-                            // Store peripheral for later connection using ID as key
-                            self.peripherals
-                                .lock()
-                                .unwrap()
-                                .insert(id.clone(), peripheral);
-
-                            devices.push(device);
+                    // Only include devices with medium or stronger signal strength
+                    if let Some(signal_strength) = rssi {
+                        if signal_strength >= MIN_RSSI_THRESHOLD {
+                            info!("Including device with sufficient signal strength (RSSI: {})", signal_strength);
+                            let bluetooth_device = BluetoothDevice::new(name.clone(), address, id, rssi);
+                            if bluetooth_device.is_gear_vr_controller(CONTROLLER_NAME) {
+                                info!("Including Gear VR Controller device: {:?}", name);
+                                if let Err(e) = window.emit("device-found", bluetooth_device) {
+                                    info!("Failed to emit device-found event: {}", e);
+                                }
+                            }
                         }
-                    } else {
-                        info!("Skipping device with weak signal (RSSI: {})", signal_strength);
                     }
-                } else {
-                    info!("Skipping device with unknown signal strength");
+                }
+
+                Err(_) => {
+                    info!("Scan timed out while waiting for a new device. Total duration reached.");
+                    break;
+                }
+
+                Ok(None) => {
+                    info!("Bluetooth scan stream has ended.");
+                    break;
                 }
             }
         }
-
-        Ok(devices)
+        
+        // Emit scan-complete event
+        if let Err(e) = window.emit("scan-complete", ()) {
+            info!("Failed to emit scan-complete event: {}", e);
+        }
+        Ok(())
     }
 
     /// Connects to a device with the given ID

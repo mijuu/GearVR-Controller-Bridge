@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
-// 定义蓝牙设备类型
+// Define Bluetooth device type
 interface BluetoothDevice {
   name?: string;
   address: string;
@@ -10,31 +11,71 @@ interface BluetoothDevice {
 }
 
 const DeviceList: React.FC = () => {
-  // 状态管理
+  // State management
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Set up event listeners
+  useEffect(() => {
+    // Listen for device discovery events
+    const deviceFoundUnlisten = listen<BluetoothDevice>('device-found', (event) => {
+      const newDevice = event.payload;
+      setDevices((currentDevices) => {
+        // Check if device already exists
+        const exists = currentDevices.some(device => device.id === newDevice.id);
+        if (exists) {
+          // Update existing device
+          return currentDevices.map(device => 
+            device.id === newDevice.id ? newDevice : device
+          );
+        } else {
+          // Add new device
+          return [...currentDevices, newDevice];
+        }
+      });
+    });
+    
+    // Listen for scan completion event
+    const scanCompleteUnlisten = listen('scan-complete', () => {
+      setIsScanning(false);
+    });
+    
+    // Listen for scan error event
+    const scanErrorUnlisten = listen<string>('scan-error', (event) => {
+      setError(`扫描错误: ${event.payload}`);
+      setIsScanning(false);
+    });
+    
+    // Cleanup function
+    return () => {
+      deviceFoundUnlisten.then(unlisten => unlisten());
+      scanCompleteUnlisten.then(unlisten => unlisten());
+      scanErrorUnlisten.then(unlisten => unlisten());
+    };
+  }, []);
 
-  // 扫描设备
-  const scanDevices = async () => {
+  // Scan devices in real-time
+  const scanDevicesRealtime = async () => {
     try {
       setIsScanning(true);
       setError(null);
-      // 清空设备列表
+      // Clear device list
       setDevices([]);
-      const foundDevices = await invoke<BluetoothDevice[]>('scan_devices', {
+      
+      // Start real-time scanning
+      await invoke('scan_devices_realtime', {
         durationSecs: 5,
       });
-      setDevices(foundDevices);
+      
     } catch (err) {
       setError(`扫描失败: ${err}`);
-    } finally {
       setIsScanning(false);
     }
   };
 
-  // 连接设备
+  // Connect to device
   const connectToDevice = async (deviceId: string) => {
     try {
       setError(null);
@@ -45,7 +86,7 @@ const DeviceList: React.FC = () => {
     }
   };
 
-  // 断开连接
+  // Disconnect
   const disconnect = async () => {
     try {
       setError(null);
@@ -56,7 +97,7 @@ const DeviceList: React.FC = () => {
     }
   };
 
-  // 渲染信号强度指示器
+  // Render signal strength indicator
   const renderSignalStrength = (rssi?: number) => {
     if (!rssi) return '无信号';
     if (rssi > -50) return '强';
@@ -68,13 +109,36 @@ const DeviceList: React.FC = () => {
     <div className="device-list">
       <div className="controls">
         <button
-          onClick={scanDevices}
+          onClick={scanDevicesRealtime}
           disabled={isScanning}
           className="scan-button"
         >
-          {isScanning ? '扫描中...' : '扫描设备'}
+          {isScanning ? (
+            <>
+              <span className="scanning-text">扫描中</span>
+              <span className="scanning-dots">...</span>
+            </>
+          ) : (
+            '扫描设备'
+          )}
         </button>
       </div>
+
+      <style>{`
+        @keyframes blink {
+          0% { opacity: .2; }
+          20% { opacity: 1; }
+          100% { opacity: .2; }
+        }
+        
+        .scanning-text {
+          margin-right: 4px;
+        }
+        
+        .scanning-dots {
+          animation: blink 1.4s infinite both;
+        }
+      `}</style>
 
       {error && <div className="error-message">{error}</div>}
 
