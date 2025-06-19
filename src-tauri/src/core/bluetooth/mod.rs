@@ -5,7 +5,7 @@
 mod commands;
 mod connection;
 mod constants;
-mod device;
+mod types;
 mod manager;
 mod notification;
 
@@ -13,6 +13,6 @@ mod notification;
 pub use commands::{CommandExecutor, CommandSender, ControllerCommand};
 pub use connection::ConnectionManager;
 pub use constants::*;  // Re-export all constants
-pub use device::BluetoothDevice;
+pub use types::{BluetoothDevice, ConnectedDeviceState};
 pub use manager::BluetoothManager;
 pub use notification::NotificationHandler;

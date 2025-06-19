@@ -8,13 +8,14 @@ interface BluetoothDevice {
   address: string;
   id: string;
   rssi?: number;
+  is_paired?: boolean;
+  is_connected?: boolean;
 }
 
 const DeviceList: React.FC = () => {
   // State management
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Set up event listeners
@@ -80,20 +81,45 @@ const DeviceList: React.FC = () => {
     try {
       setError(null);
       await invoke('connect_to_device', { deviceId });
-      setSelectedDevice(deviceId);
     } catch (err) {
       setError(`连接失败: ${err}`);
     }
   };
 
   // Disconnect
-  const disconnect = async () => {
+  const disconnect = async (deviceId: string) => {
     try {
       setError(null);
-      await invoke('disconnect');
-      setSelectedDevice(null);
+      await invoke('disconnect', { deviceId });
     } catch (err) {
       setError(`断开连接失败: ${err}`);
+    }
+  };
+
+  const [isChecking, setIsChecking] = useState(false);
+  const [isReading, setIsReading] = useState(false);
+
+  const checkStatus = async (deviceId: string) => {
+    try {
+      setIsChecking(true);
+      setError(null);
+      await invoke('check_device_status', { deviceId });
+    } catch (err) {
+      setError(`状态检查失败: ${err}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const readData = async (deviceId: string) => {
+    try {
+      setIsReading(true);
+      setError(null);
+      await invoke('read_sensor_data', { deviceId });
+    } catch (err) {
+      setError(`数据读取失败: ${err}`);
+    } finally {
+      setIsReading(false);
     }
   };
 
@@ -111,7 +137,7 @@ const DeviceList: React.FC = () => {
         <button
           onClick={scanDevicesRealtime}
           disabled={isScanning}
-          className="scan-button"
+          className="button scan-button"
         >
           {isScanning ? (
             <>
@@ -147,7 +173,7 @@ const DeviceList: React.FC = () => {
           <div
             key={device.id}
             className={`device-item ${
-              selectedDevice === device.id ? 'selected' : ''
+              device.is_connected ? 'selected' : ''
             }`}
           >
             <div className="device-info">
@@ -166,18 +192,42 @@ const DeviceList: React.FC = () => {
               <div className="signal-strength">
                 信号: {renderSignalStrength(device.rssi)}
               </div>
+              <div className="device-status">
+                {device.is_paired && (
+                  <span className="status-badge paired">已配对</span>
+                )}
+                {device.is_connected && (
+                  <span className="status-badge connected">已连接</span>
+                )}
+              </div>
             </div>
             <div className="device-actions">
-              {selectedDevice === device.id ? (
-                <button onClick={disconnect} className="disconnect-button">
-                  断开连接
-                </button>
+              {device.is_connected ? (
+                <>
+                  <button onClick={() => disconnect(device.id)} className="button disconnect-button">
+                    断开连接
+                  </button>
+                  <button 
+                    onClick={() => checkStatus(device.id)}
+                    disabled={isChecking}
+                    className="button status-button"
+                  >
+                    {isChecking ? '检查中...' : '检查状态'}
+                  </button>
+                  <button
+                    onClick={() => readData(device.id)}
+                    disabled={isReading}
+                    className="button data-button"
+                  >
+                    {isReading ? '读取中...' : '读取数据'}
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => connectToDevice(device.id)}
                   className="connect-button"
                 >
-                  连接
+                  {device.is_paired ? '重新连接' : '配对并连接'}
                 </button>
               )}
             </div>
@@ -258,14 +308,35 @@ const DeviceList: React.FC = () => {
         .signal-strength {
           color: #28a745;
           font-size: 0.9rem;
+          margin-bottom: 0.25rem;
+        }
+
+        .device-status {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 0.25rem;
+        }
+
+        .status-badge {
+          font-size: 0.8rem;
+          padding: 0.2rem 0.4rem;
+          border-radius: 4px;
+          color: white;
+        }
+
+        .status-badge.paired {
+          background-color: #6c757d;
+        }
+
+        .status-badge.connected {
+          background-color: #17a2b8;
         }
 
         .device-actions {
           margin-left: 1rem;
         }
 
-        .connect-button,
-        .disconnect-button {
+        .button {
           padding: 0.375rem 0.75rem;
           border: none;
           border-radius: 4px;

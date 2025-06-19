@@ -64,6 +64,12 @@ impl<T: CommandSender> CommandExecutor<T> {
         Self { command_sender }
     }
 
+    pub async fn off(&self) -> Result<()> {
+        info!("Turning off controller");
+        self.command_sender.send_command(ControllerCommand::Off).await?;
+        Ok(())
+    }
+
     /// Initialize the controller with sensor mode or VR mode
     pub async fn initialize_controller(&self, vr_mode: bool) -> Result<()> {
         // Send the appropriate mode command
@@ -101,7 +107,7 @@ impl<T: CommandSender> CommandExecutor<T> {
     }
 
     /// Start the keepalive timer
-    pub fn start_keepalive_timer(&self, interval_secs: u64) 
+    pub fn start_keepalive_timer(&self, interval_secs: u64)
     where
         T: Clone + Send + Sync + 'static,
     {

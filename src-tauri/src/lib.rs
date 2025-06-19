@@ -8,7 +8,7 @@ pub mod state;
 pub mod logging;
 
 // Import our modules
-use commands::{connect_to_device, disconnect, scan_devices_realtime};
+use commands::{connect_to_device, disconnect, scan_devices_realtime, check_device_status, read_sensor_data};
 use state::AppState;
 use tauri::Manager;
 
@@ -20,7 +20,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_devices_realtime,
             connect_to_device,
-            disconnect
+            disconnect,
+            check_device_status,
+            read_sensor_data,
         ])
         // Setup our application state
         .setup(|app| {
