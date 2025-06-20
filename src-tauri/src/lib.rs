@@ -30,10 +30,10 @@ pub fn run() {
             app.manage(AppState::new());
             
             // 初始化自定义日志处理器
-            if let Err(_) = logging::TauriLogger::init(app.handle().clone(), log::Level::Debug) {
+            if let Err(_) = logging::TauriLogger::init(app.handle().clone(), log::Level::Info) {
                 // 只有在TauriLogger初始化失败时才使用env_logger作为后备
                 env_logger::builder()
-                    .filter_level(log::LevelFilter::Debug)
+                    .filter_level(log::LevelFilter::Info)
                     .init();
             }
             

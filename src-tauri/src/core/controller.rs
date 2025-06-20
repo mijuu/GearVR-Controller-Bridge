@@ -104,33 +104,36 @@ impl ControllerParser {
     
     /// Parses raw data from the controller
     pub fn parse_data(&mut self, data: &[u8]) -> Option<ControllerState> {
-        if data.len() < 20 {
+        if data.len() < 59 {
             return None; // Not enough data
         }
         
-        // Parse button states
-        let button_byte = data[0];
+        // Parse button states (from byte 58)
+        let button_byte = data[58];
         let buttons = ButtonState {
-            trigger: (button_byte & 0x01) != 0,
-            home: (button_byte & 0x02) != 0,
-            back: (button_byte & 0x04) != 0,
-            touchpad: (button_byte & 0x08) != 0,
-            volume_up: (button_byte & 0x10) != 0,
-            volume_down: (button_byte & 0x20) != 0,
+            trigger: (button_byte & (1 << 0)) != 0,
+            home: (button_byte & (1 << 1)) != 0,
+            back: (button_byte & (1 << 2)) != 0,
+            touchpad: (button_byte & (1 << 3)) != 0,
+            volume_up: (button_byte & (1 << 4)) != 0,
+            volume_down: (button_byte & (1 << 5)) != 0,
         };
         
-        // Parse touchpad state
-        let touchpad_byte = data[1];
-        let touchpad_x = if data.len() > 2 { data[2] as f32 / 255.0 } else { 0.0 };
-        let touchpad_y = if data.len() > 3 { data[3] as f32 / 255.0 } else { 0.0 };
+        // Parse touchpad coordinates (from bytes 54-56)
+        let axis_x = ((((data[54] as u16 & 0xF) << 6) + ((data[55] as u16 & 0xFC) >> 2)) & 0x3FFu16) as f32;
+        let axis_y = ((((data[55] as u16 & 0x3) << 8) + (data[56] as u16 & 0xFF)) & 0x3FFu16) as f32;
+        
+        // Normalize to 0.0-1.0 range (max observed value is 315)
+        let touchpad_x = (axis_x as f32 / 315.0).clamp(0.0, 1.0);
+        let touchpad_y = (axis_y as f32 / 315.0).clamp(0.0, 1.0);
+        
         let touchpad = TouchpadState {
-            touched: (touchpad_byte & 0x01) != 0,
+            touched: touchpad_x > 0.0 || touchpad_y > 0.0,
             x: touchpad_x,
             y: touchpad_y,
         };
         
         // Parse sensor data (simplified - in a real implementation, this would be more complex)
-        // For now, we'll just use placeholder values
         let orientation = Quaternion {
             x: 0.0,
             y: 0.0,
@@ -138,21 +141,25 @@ impl ControllerParser {
             w: 1.0,
         };
         
+        // Placeholder for accelerometer data
         let accelerometer = Vector3 {
             x: 0.0,
             y: 0.0,
             z: 0.0,
         };
         
+        // Placeholder for gyroscope data
         let gyroscope = Vector3 {
             x: 0.0,
             y: 0.0,
             z: 0.0,
         };
         
-        // Parse battery level and temperature (placeholder)
+        // Parse temperature (from byte 57)
+        let temperature = data[57] as f32;
+        
+        // Placeholder for battery level
         let battery_level = 100; // 100%
-        let temperature = 25.0; // 25°C
         
         // Create controller state
         let state = ControllerState {

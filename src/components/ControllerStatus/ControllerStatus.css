@@ -1,0 +1,142 @@
+.controller-status {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e0e0e0;
+    background-color: #2a2a2a;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.controller-status h2 {
+    margin-top: 0;
+    color: #ffffff;
+    border-bottom: 1px solid #444;
+    padding-bottom: 0.5rem;
+}
+
+.section {
+    margin-bottom: 1.5rem;
+    background-color: #333;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.section h3 {
+    margin-top: 0;
+    color: #bbbbbb;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+}
+
+.button-indicator {
+    background-color: #444;
+    padding: 0.8rem;
+    border-radius: 4px;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: default;
+    user-select: none;
+}
+
+.button-indicator.active {
+    background-color: #4caf50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.button-indicator span {
+    display: block;
+    font-weight: bold;
+}
+
+.touchpad-display {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    background-color: #222;
+    border-radius: 8px;
+    margin: 0 auto 1rem;
+    border: 1px solid #444;
+}
+
+.touch-indicator {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: #ff5722;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px rgba(255, 87, 34, 0.7);
+    transition: all 0.1s linear;
+}
+
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.sensor-data {
+    background-color: #3a3a3a;
+    padding: 0.8rem;
+    border-radius: 4px;
+}
+
+.sensor-data h4 {
+    margin-top: 0;
+    color: #aaaaaa;
+}
+
+.device-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.battery-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.battery-bar {
+    width: 100px;
+    height: 20px;
+    background-color: #333;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.battery-level {
+    height: 100%;
+    background: linear-gradient(to right, #4caf50, #8bc34a);
+    transition: width 0.5s ease;
+}
+
+.temperature-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+    .button-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sensor-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .device-status {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}

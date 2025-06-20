@@ -57,11 +57,6 @@ impl NotificationHandler {
                         Ok(value) => {
                             debug!("Received controller data: {:?}", value);
 
-                            if value.len() < 10 {
-                                error!("Unknow data: {:?}", value);
-                                break;
-                            }
-
                             // Parse the controller data
                             let controller_state = {
                                 let mut parser = controller_parser.lock().unwrap();

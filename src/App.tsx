@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import DeviceList from "./components/DeviceList";
+import ControllerStatus from "./components/ControllerStatus/ControllerStatus";
 import StatusBar from "./components/StatusBar";
 import LogViewer from "./components/LogViewer";
 import { LogMessage } from "./components/LogViewer";
@@ -113,7 +114,14 @@ function App() {
       </header>
 
       <main className="app-content">
-        <DeviceList />
+        <div className="content-grid">
+          <div className="device-list-container">
+            <DeviceList />
+          </div>
+          <div className="controller-status-container">
+            <ControllerStatus />
+          </div>
+        </div>
         {showLogs && (
           <div className="log-overlay">
             <LogViewer logs={logs} onClearLogs={clearLogs} />
@@ -163,6 +171,24 @@ function App() {
           flex: 1;
           overflow-y: auto;
           padding: 1rem;
+        }
+
+        .content-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+        }
+
+        .device-list-container,
+        .controller-status-container {
+          overflow-y: auto;
+          max-height: calc(100vh - 200px);
+        }
+
+        @media (max-width: 1200px) {
+          .content-grid {
+            grid-template-columns: 1fr;
+          }
         }
 
         .app-footer {
