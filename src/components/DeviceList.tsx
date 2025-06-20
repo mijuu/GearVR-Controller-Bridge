@@ -37,6 +37,17 @@ const DeviceList: React.FC = () => {
         }
       });
     });
+
+    // Update device status
+    const updateDeviceUnlisten = listen<BluetoothDevice>('update-device', (event) => {
+      const newDevice = event.payload;
+      setDevices((currentDevices) => {
+          // Update existing device
+          return currentDevices.map(device => 
+            device.id === newDevice.id ? {...device , ...newDevice} : device
+          );
+      });
+    });
     
     // Listen for scan completion event
     const scanCompleteUnlisten = listen('scan-complete', () => {
@@ -52,6 +63,7 @@ const DeviceList: React.FC = () => {
     // Cleanup function
     return () => {
       deviceFoundUnlisten.then(unlisten => unlisten());
+      updateDeviceUnlisten.then(unlisten => unlisten());
       scanCompleteUnlisten.then(unlisten => unlisten());
       scanErrorUnlisten.then(unlisten => unlisten());
     };
@@ -76,13 +88,26 @@ const DeviceList: React.FC = () => {
     }
   };
 
+  const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
   // Connect to device
   const connectToDevice = async (deviceId: string) => {
     try {
+      setConnectingDeviceId(deviceId);
       setError(null);
       await invoke('connect_to_device', { deviceId });
+      // 连接成功后的逻辑（如果需要）
     } catch (err) {
-      setError(`连接失败: ${err}`);
+      const errorMessage = typeof err === 'string' ? err 
+                        : err instanceof Error ? err.message
+                        : '未知错误';
+      
+      if (errorMessage.includes('Peer removed pairing information')) {
+        setError('检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接');
+      } else {
+        setError(`连接失败: ${errorMessage}`);
+      }
+    } finally {
+      setConnectingDeviceId(null);
     }
   };
 
@@ -91,6 +116,12 @@ const DeviceList: React.FC = () => {
     try {
       setError(null);
       await invoke('disconnect', { deviceId });
+      setDevices((currentDevices) => {
+          // Update existing device
+          return currentDevices.map(device => 
+            device.id === deviceId ? {...device , is_connected: false } : device
+          );
+      });
     } catch (err) {
       setError(`断开连接失败: ${err}`);
     }
@@ -225,9 +256,13 @@ const DeviceList: React.FC = () => {
               ) : (
                 <button
                   onClick={() => connectToDevice(device.id)}
-                  className="connect-button"
+                  disabled={connectingDeviceId === device.id}
                 >
-                  {device.is_paired ? '重新连接' : '配对并连接'}
+                  {connectingDeviceId === device.id ? (
+                    <span>连接中...</span>
+                  ) : (
+                    <span>连接</span>
+                  )}
                 </button>
               )}
             </div>

@@ -84,7 +84,7 @@ impl<T: CommandSender> CommandExecutor<T> {
         self.command_sender.send_command(command).await?;
         
         // Wait for command to take effect
-        sleep(Duration::from_millis(5000)).await;
+        sleep(Duration::from_millis(100)).await;
         info!("Controller initialized in {} mode", if vr_mode { "VR" } else { "Sensor" });
 
         Ok(())

@@ -1,8 +1,8 @@
 //! Notification handling for the GearVR Controller
 //! This module handles setting up and processing notifications from the controller
 
-use anyhow::{anyhow, Result};
-use bluest::{Characteristic, Uuid};
+use anyhow::{Result};
+use bluest::{Characteristic};
 use futures_util::StreamExt;
 use log::{debug, error, info};
 use std::sync::{Arc, Mutex};
@@ -56,6 +56,11 @@ impl NotificationHandler {
                     match result {
                         Ok(value) => {
                             debug!("Received controller data: {:?}", value);
+
+                            if value.len() < 10 {
+                                error!("Unknow data: {:?}", value);
+                                break;
+                            }
 
                             // Parse the controller data
                             let controller_state = {

@@ -2,7 +2,7 @@
 //! This module defines all the commands that can be invoked from the frontend.
 
 use crate::state::AppState;
-use tauri::{window, Emitter, State, Window};
+use tauri::{Emitter, State, Window};
 
 /// Connects to a Bluetooth device
 ///
@@ -93,12 +93,12 @@ pub async fn check_device_status(device_id: String, state: State<'_, AppState>) 
     bluetooth_manager.check_controller_status(&device_id).await.map_err(|e| e.to_string())
 }
 #[tauri::command]
-pub async fn read_sensor_data(window: Window, device_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn read_sensor_data(window: Window, state: State<'_, AppState>) -> Result<(), String> {
     // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
     let bluetooth_manager = {
         let guard = state.bluetooth().map_err(|e| e.to_string())?;
         guard.as_ref().unwrap().clone()
     };
     
-    bluetooth_manager.read_controller_data(window, &device_id).await.map_err(|e| e.to_string())
+    bluetooth_manager.read_controller_data(window).await.map_err(|e| e.to_string())
 }

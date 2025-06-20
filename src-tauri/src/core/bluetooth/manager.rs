@@ -39,8 +39,6 @@ pub struct BluetoothManager {
     devices: Arc<Mutex<HashMap<String, Device>>>,
     /// Currently connected device
     connected_state: Arc<Mutex<Option<ConnectedDeviceState>>>,
-    /// Controller data parser
-    controller_parser: Arc<Mutex<ControllerParser>>,
     /// Connection manager
     connection_manager: ConnectionManager,
     /// Notification handler
@@ -63,7 +61,6 @@ impl BluetoothManager {
             adapter,
             devices: Arc::new(Mutex::new(HashMap::new())),
             connected_state: Arc::new(Mutex::new(None)),
-            controller_parser,
             connection_manager,
             notification_handler,
         })
@@ -101,7 +98,7 @@ impl BluetoothManager {
                     let id = device.id().to_string();
                     let rssi = discovered_device.rssi;
                     let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
-                    let is_paired = device.is_paired().await.unwrap();
+                    let is_paired = device.is_paired().await.unwrap_or(false);
                     let is_connected = device.is_connected().await;
                     let battery_level = None;
                     
@@ -112,7 +109,7 @@ impl BluetoothManager {
                     // Only include devices with medium or stronger signal strength
                     if let Some(signal_strength) = rssi {
                         if signal_strength >= MIN_RSSI_THRESHOLD {
-                            let bluetooth_device = BluetoothDevice::new(name.clone(), address.clone(), id.clone(), rssi, battery_level, is_paired, is_connected);
+                            let bluetooth_device = BluetoothDevice::new(id.clone(), name.clone(), Some(address.clone()), rssi, battery_level, Some(is_paired), Some(is_connected));
                             if bluetooth_device.is_gear_vr_controller(CONTROLLER_NAME) {
                                 info!("Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
                         address, id, name, rssi, battery_level, is_paired, is_connected);
@@ -125,6 +122,7 @@ impl BluetoothManager {
                                 if let Err(e) = window.emit("device-found", bluetooth_device) {
                                     error!("Failed to emit device-found event: {}", e);
                                 }
+                                break;
                             }
                         }
                     }
@@ -258,7 +256,7 @@ impl BluetoothManager {
         Ok(Some(battery_data[0]))
     }
 
-    pub async fn read_controller_data(&self, window: Window, device_id: &str) -> Result<()> {
+    pub async fn read_controller_data(&self, window: Window) -> Result<()> {
         let connected_state = {
             let connected = self.connected_state.lock().unwrap();
             connected.clone().ok_or_else(|| anyhow!("No device connected"))?

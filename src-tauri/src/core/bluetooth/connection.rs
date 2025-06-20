@@ -3,12 +3,11 @@
 
 use anyhow::{anyhow, Result};
 use bluest::{Adapter, Characteristic, Device, Uuid};
-use futures_util::StreamExt;
 use log::{info, warn, error};
-use std::error::Error;
 use std::time::Duration;
 use tauri::{Window, Emitter};
 
+use crate::core::bluetooth::types::{BluetoothDevice};
 use crate::core::bluetooth::notification::NotificationHandler;
 use crate::core::bluetooth::{commands::{CommandExecutor, CommandSender, ControllerCommand}};
 
@@ -77,21 +76,18 @@ impl ConnectionManager {
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
     ) -> Result<(Characteristic, Characteristic)> {
-        info!("Device details - ID: {}, Name: {:?}", device.id(), device.name());
+        let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
+        let id = device.id().to_string();
+        info!("Device details - ID: {}, Name: {:?}", id, name);
 
-        if device.is_connected().await {
-            if cfg!(target_os = "macos") {
-                info!("Device already connected, disconnecting first...");
-                self.disconnect(device).await?;
-                // 短暂等待以确保系统状态更新
-                tokio::time::sleep(Duration::from_millis(1000)).await;
-            }
+
+        if !device.is_connected().await {
+            info!("Initiating connection to {}...", id);
+            self.adapter.connect_device(&device).await?;
         }
-
-        info!("Initiating connection to {}...", device.id());
-        self.adapter.connect_device(device).await?;
-        info!("Connection successful, discovering services...");
         
+        
+        info!("Connection successful, discovering services...");
         let services = device.services().await?;
         let controller_service = services
             .iter()
@@ -126,23 +122,8 @@ impl ConnectionManager {
         let command_sender = BluestCommandSender::new(write_char.clone());
         let command_executor = CommandExecutor::new(command_sender);
 
-        info!("Initializing controller in sensor mode...");
-        // command_executor.initialize_controller(false).await?;
-        info!("Controller initialized successfully in sensor mode");
-
 
         let notify_char_for_task = notify_char.clone();
-        let window_clone = window.clone();
-        // 添加连接状态检查
-        tokio::time::sleep(Duration::from_millis(1000)).await;
-        if !device.is_connected().await {
-            warn!("Device not connected when starting notification task");
-        }
-        
-        // 添加特征属性检查
-        info!("    {:?}", notify_char_for_task);
-        let props = notify_char_for_task.properties().await;
-            info!("      props: {:?}", props);
 
         // 设置通知监听
         info!("Setting up notifications...");
@@ -151,11 +132,18 @@ impl ConnectionManager {
             window.clone(),
         ).await?;
 
+        info!("Initializing controller in sensor mode...");
+        command_executor.initialize_controller(false).await?;
+        info!("Controller initialized successfully in sensor mode");
 
-        info!("Starting keepalive timer...");
+        // info!("Starting keepalive timer...");
         // command_executor.start_keepalive_timer(60);
 
         info!("Connection and setup process completed successfully");
+        let bluetooth_device = BluetoothDevice::new(id,Some(name), None, None, None, Some(true), Some(true));
+        if let Err(e) = window.emit("update-device", bluetooth_device) {
+            error!("Failed to emit update-device event: {}", e);
+        }
         Ok((notify_char, write_char))
     }
 
