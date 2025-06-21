@@ -179,12 +179,6 @@ function App() {
           gap: 1rem;
         }
 
-        .device-list-container,
-        .controller-status-container {
-          overflow-y: auto;
-          max-height: calc(100vh - 200px);
-        }
-
         @media (max-width: 1200px) {
           .content-grid {
             grid-template-columns: 1fr;

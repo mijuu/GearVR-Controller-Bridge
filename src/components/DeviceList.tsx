@@ -127,33 +127,6 @@ const DeviceList: React.FC = () => {
     }
   };
 
-  const [isChecking, setIsChecking] = useState(false);
-  const [isReading, setIsReading] = useState(false);
-
-  const checkStatus = async (deviceId: string) => {
-    try {
-      setIsChecking(true);
-      setError(null);
-      await invoke('check_device_status', { deviceId });
-    } catch (err) {
-      setError(`状态检查失败: ${err}`);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const readData = async (deviceId: string) => {
-    try {
-      setIsReading(true);
-      setError(null);
-      await invoke('read_sensor_data', { deviceId });
-    } catch (err) {
-      setError(`数据读取失败: ${err}`);
-    } finally {
-      setIsReading(false);
-    }
-  };
-
   // Render signal strength indicator
   const renderSignalStrength = (rssi?: number) => {
     if (!rssi) return '无信号';
@@ -237,20 +210,6 @@ const DeviceList: React.FC = () => {
                 <>
                   <button onClick={() => disconnect(device.id)} className="button disconnect-button">
                     断开连接
-                  </button>
-                  <button 
-                    onClick={() => checkStatus(device.id)}
-                    disabled={isChecking}
-                    className="button status-button"
-                  >
-                    {isChecking ? '检查中...' : '检查状态'}
-                  </button>
-                  <button
-                    onClick={() => readData(device.id)}
-                    disabled={isReading}
-                    className="button data-button"
-                  >
-                    {isReading ? '读取中...' : '读取数据'}
                   </button>
                 </>
               ) : (

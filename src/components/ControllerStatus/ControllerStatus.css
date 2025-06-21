@@ -139,35 +139,143 @@
     }
 }
 
-/* 3D视图布局 */
-.controller-layout {
+.controller-status {
     display: flex;
+    flex-direction: column;
     gap: 20px;
-    margin-top: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
-.controller-3d-view {
-    flex: 1;
-    min-height: 500px;
+.top-section {
+    display: flex;
+    gap: 20px;
+    height: 500px;
+}
+
+.model-view {
+    flex: 2;
     background: #222;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #444;
 }
 
-.controller-data {
+.right-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 20px;
 }
 
+.touchpad-container {
+    flex: 1;
+    padding: 15px;
+    background-color: #333;
+    border-radius: 8px;
+}
+
+.touchpad-display {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #222;
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.touchpad-coords {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.buttons-container {
+    flex: 1;
+    padding: 15px;
+    background-color: #333;
+    border-radius: 8px;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    height: 100%;
+}
+
+.button-indicator {
+    width: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #444;
+    cursor: pointer;
+}
+
+.button-indicator.active {
+    background-color: #4CAF50;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.bottom-section {
+    padding: 15px;
+    background-color: #333;
+    border-radius: 8px;
+}
+
+.device-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.battery-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.battery-bar {
+    width: 150px;
+    height: 20px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.battery-level {
+    height: 100%;
+    background: linear-gradient(to right, #f44336, #ffeb3b, #4CAF50);
+}
+
+.temperature-status {
+    display: flex;
+    gap: 10px;
+}
+
 @media (max-width: 768px) {
-    .controller-layout {
+    .top-section {
         flex-direction: column;
+        height: auto;
     }
     
-    .controller-3d-view {
-        min-height: 300px;
+    .model-view {
+        height: 300px;
+    }
+    
+    .touchpad-display {
+        height: 200px;
+    }
+    
+    .button-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
