@@ -39,7 +39,6 @@
     padding: 0.8rem;
     border-radius: 4px;
     text-align: center;
-    transition: all 0.2s ease;
     cursor: default;
     user-select: none;
 }
@@ -72,7 +71,6 @@
     border-radius: 50%;
     transform: translate(-50%, -50%);
     box-shadow: 0 0 10px rgba(255, 87, 34, 0.7);
-    transition: all 0.1s linear;
 }
 
 .sensor-grid {

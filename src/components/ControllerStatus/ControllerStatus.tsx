@@ -33,12 +33,35 @@ interface ControllerState {
         y: number;
         z: number;
     };
-    battery_level: number;
+    magnetometer: {
+        x: number;
+        y: number;
+        z: number;
+    };
     temperature: number;
 }
 
 export default function ControllerStatus() {
     const [state, setState] = useState<ControllerState | null>(null);
+    const [battery_level, setBatteryLevel] = useState<number | null>(null);
+
+    useEffect(() => {
+        const setupListener = async () => {
+            const unlisten = await listen<number>(
+                "battery-level",
+                (event) => {
+                    setBatteryLevel(event.payload);
+                }
+                );
+            return unlisten;
+        };
+
+        const unlistenPromise = setupListener();
+
+        return () => {
+            unlistenPromise.then((unlisten) => unlisten());
+        };
+    }, []);
 
     useEffect(() => {
         const setupListener = async () => {
@@ -128,6 +151,12 @@ export default function ControllerStatus() {
                         <div>Y: {state.gyroscope.y.toFixed(4)}</div>
                         <div>Z: {state.gyroscope.z.toFixed(4)}</div>
                     </div>
+                    <div className="sensor-data">
+                        <h4>磁力计 (μT)</h4>
+                        <div>X: {state.magnetometer.x.toFixed(2)}</div>
+                        <div>Y: {state.magnetometer.y.toFixed(2)}</div>
+                        <div>Z: {state.magnetometer.z.toFixed(2)}</div>
+                    </div>
                 </div>
             </div>
 
@@ -139,10 +168,10 @@ export default function ControllerStatus() {
                         <div className="battery-bar">
                             <div 
                                 className="battery-level"
-                                style={{ width: `${state.battery_level}%` }}
+                                style={{ width: `${battery_level}%` }}
                             ></div>
                         </div>
-                        <span>{state.battery_level}%</span>
+                        <span>{battery_level || '? '}%</span>
                     </div>
                     <div className="temperature-status">
                         <span>温度: </span>

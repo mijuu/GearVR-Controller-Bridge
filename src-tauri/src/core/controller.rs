@@ -25,8 +25,8 @@ pub struct ControllerState {
     /// Gyroscope data (in rad/s)
     pub gyroscope: Vector3,
     
-    /// Battery level (0-100%)
-    pub battery_level: u8,
+    /// Magnetometer data (in μT)
+    pub magnetometer: Vector3,
     
     /// Temperature (in °C)
     pub temperature: f32,
@@ -133,33 +133,61 @@ impl ControllerParser {
             y: touchpad_y,
         };
         
-        // Parse sensor data (simplified - in a real implementation, this would be more complex)
-        let orientation = Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        };
-        
-        // Placeholder for accelerometer data
+        // Parse accelerometer data (bytes 4-9)
+        // Raw values are 16-bit signed integers (big-endian)
+        // Conversion formula: raw * 9.80665 / 2048.0 (to m/s²)
         let accelerometer = Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
+            x: (((data[4] as i16) << 8) | data[5] as i16) as f32 * 9.80665 / 2048.0,
+            y: (((data[6] as i16) << 8) | data[7] as i16) as f32 * 9.80665 / 2048.0,
+            z: (((data[8] as i16) << 8) | data[9] as i16) as f32 * 9.80665 / 2048.0,
         };
         
-        // Placeholder for gyroscope data
+        // Parse gyroscope data (bytes 10-15) 
+        // Raw values are 16-bit signed integers (big-endian)
+        // Conversion formula: raw * (π/180) / 14.285 (to rad/s)
         let gyroscope = Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
+            x: (((data[10] as i16) << 8) | data[11] as i16) as f32 * 0.017453292 / 14.285,
+            y: (((data[12] as i16) << 8) | data[13] as i16) as f32 * 0.017453292 / 14.285,
+            z: (((data[14] as i16) << 8) | data[15] as i16) as f32 * 0.017453292 / 14.285,
         };
         
+        // Calculate initial orientation from accelerometer (pitch and roll)
+        let norm = (accelerometer.x * accelerometer.x + 
+                   accelerometer.y * accelerometer.y + 
+                   accelerometer.z * accelerometer.z).sqrt();
+        
+        let (pitch, roll) = if norm > 0.0 {
+            let pitch = (-accelerometer.x / norm).asin();
+            let roll = (accelerometer.y / norm).asin();
+            (pitch, roll)
+        } else {
+            (0.0, 0.0)
+        };
+        
+        // Convert to quaternion
+        let cy = (pitch * 0.5).cos();
+        let sy = (pitch * 0.5).sin();
+        let cr = (roll * 0.5).cos();
+        let sr = (roll * 0.5).sin();
+        
+        let orientation = Quaternion {
+            x: sr * cy,
+            y: cr * sy,
+            z: cr * cy,
+            w: sr * sy,
+        };
+        
+        // Parse magnetometer data (bytes 48-54)
+        // Raw values are 16-bit signed integers (little-endian)
+        // Conversion formula: raw * 0.06 (to μT)
+        let magnetometer = Vector3 {
+            x: ((data[51] as i16) << 8 | data[50] as i16) as f32 * 0.06,
+            y: ((data[49] as i16) << 8 | data[48] as i16) as f32 * 0.06,
+            z: ((data[53] as i16) << 8 | data[52] as i16) as f32 * 0.06,
+        };
+
         // Parse temperature (from byte 57)
         let temperature = data[57] as f32;
-        
-        // Placeholder for battery level
-        let battery_level = 100; // 100%
         
         // Create controller state
         let state = ControllerState {
@@ -172,7 +200,7 @@ impl ControllerParser {
             orientation,
             accelerometer,
             gyroscope,
-            battery_level,
+            magnetometer,
             temperature,
         };
         
