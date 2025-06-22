@@ -7,7 +7,6 @@ use std::time::{Duration};
 use ahrs::{Madgwick, Ahrs}; 
 use nalgebra::{Vector3, UnitQuaternion};
 
-
 /// Represents the state of the GearVR controller
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerState {
@@ -28,6 +27,7 @@ pub struct ControllerState {
     
     /// Gyroscope data (in rad/s)
     pub gyroscope: Vector3<f64>, 
+
     /// Magnetometer data (in μT)
     pub magnetometer: Vector3<f64>,
     
@@ -55,6 +55,23 @@ pub struct TouchpadState {
     pub y: f32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControllerConfig {
+    /// 原始传感器数据 (加速度计、陀螺仪、磁力计) 低通滤波的 alpha 值。
+    /// 控制传感器噪声的抑制程度。值越小滤波越强，延迟越大。
+    pub sensor_low_pass_alpha: f64,
+
+    /// 传感器时间步长 (delta_t) 平滑的 alpha 值。
+    /// 控制时间步长的稳定性。值越小平滑越强，但可能引入更多延迟。
+    pub delta_t_smoothing_alpha: f64,
+
+    // 你也可以添加其他的参数，例如：
+    /// 磁力计有效性的最大模长阈值 (μT)。
+    pub mag_norm_max_threshold: f64,
+    /// 磁力计有效性的最小模长阈值 (μT)。
+    pub mag_norm_min_threshold: f64,
+}
+
 /// Controller data parser
 pub struct ControllerParser {
     /// Last received state
@@ -71,6 +88,28 @@ pub struct ControllerParser {
 
     /// The last zero orientation
     last_zero_quaternion: Option<UnitQuaternion<f64>>,
+
+    /// smoothed delta_t
+    smoothed_delta_t: f64,
+
+    /// filtered sensor data
+    last_filtered_accel: Vector3<f64>,
+    last_filtered_gyro: Vector3<f64>,
+    last_filtered_mag: Vector3<f64>,
+
+    pub config: ControllerConfig,
+}
+
+impl Default for ControllerConfig {
+    fn default() -> Self {
+        ControllerConfig {
+            sensor_low_pass_alpha: 0.8,
+            delta_t_smoothing_alpha: 0.8,
+            // https://github.com/uutzinger/gearVRC/blob/main/gearVRC.py#L90
+            mag_norm_max_threshold: 1.2 * 33078.93064435485 / 1000.0,
+            mag_norm_min_threshold: 0.8 * 33078.93064435485 / 1000.0,
+        }
+    }
 }
 
 impl ControllerParser {
@@ -88,6 +127,11 @@ impl ControllerParser {
             ahrs_filter,
             last_ahrs_orientation: UnitQuaternion::identity(),
             last_zero_quaternion: None,
+            smoothed_delta_t: sample_period,
+            last_filtered_accel: Vector3::zeros(),
+            last_filtered_gyro: Vector3::zeros(),
+            last_filtered_mag: Vector3::zeros(),
+            config: ControllerConfig::default(),
         }
     }
     
@@ -122,29 +166,35 @@ impl ControllerParser {
 
         // 9.80665 / 2048.0 = 0.00478840332
         let acc_val_factor = 0.00478840332;
-        let raw_accel = Vector3::new(
+        let accelerometer = Vector3::new(
             i16::from_le_bytes([data[4], data[5]]) as f64 * acc_val_factor,
             i16::from_le_bytes([data[6], data[7]]) as f64 * acc_val_factor,
             i16::from_le_bytes([data[8], data[9]]) as f64 * acc_val_factor,
         );
-        let accelerometer = Vector3::new(raw_accel.x, raw_accel.y, raw_accel.z);
 
         // 0.017453292 / 14.285 = 0.001221791529
         let gyr_val_factor = 0.001221791529;
-        let raw_gyro = Vector3::new(
+        let gyroscope = Vector3::new(
             i16::from_le_bytes([data[10], data[11]]) as f64 * gyr_val_factor, 
             i16::from_le_bytes([data[12], data[13]]) as f64 * gyr_val_factor,
             i16::from_le_bytes([data[14], data[15]]) as f64 * gyr_val_factor,
         );
-        let gyroscope = Vector3::new(raw_gyro.x, raw_gyro.y, raw_gyro.z);
 
         let mag_val_factor = 0.06;
-        let raw_mag = Vector3::new(
+        let magnetometer = Vector3::new(
             i16::from_le_bytes([data[48], data[49]]) as f64 * mag_val_factor,
             i16::from_le_bytes([data[50], data[51]]) as f64 * mag_val_factor,
             i16::from_le_bytes([data[52], data[53]]) as f64 * mag_val_factor,
         );
-        let magnetometer = Vector3::new(raw_mag.x, raw_mag.y, raw_mag.z);
+
+        let filter_alpha_sensor = self.config.sensor_low_pass_alpha;
+        let current_accel_filtered = accelerometer * filter_alpha_sensor + self.last_filtered_accel * (1.0 - filter_alpha_sensor);
+        let current_gyro_filtered = gyroscope * filter_alpha_sensor + self.last_filtered_gyro * (1.0 - filter_alpha_sensor);
+        let current_mag_filtered = magnetometer * filter_alpha_sensor + self.last_filtered_mag * (1.0 - filter_alpha_sensor);
+
+        self.last_filtered_accel = current_accel_filtered;
+        self.last_filtered_gyro = current_gyro_filtered;
+        self.last_filtered_mag = current_mag_filtered;
         
         let temperature = data[57] as f64;
 
@@ -153,13 +203,10 @@ impl ControllerParser {
         let current_sensor_time_seconds = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as f64 / 1_000_000.0;
 
         // --- 计算 delta_t ---
-        let mut delta_t: f64;
+        let delta_t: f64;
         if let Some(prev_time) = self.last_sensor_time {
             delta_t = current_sensor_time_seconds - prev_time;
 
-            const MIN_ACCEPTABLE_DELTA_T: f64 = 1.0 / 2000.0; // 例如，假定最高频率是 2000Hz
-            const MAX_ACCEPTABLE_DELTA_T: f64 = 1.0 / 10.0;  // 例如，假定最低频率是 10Hz
-            delta_t = delta_t.max(MIN_ACCEPTABLE_DELTA_T).min(MAX_ACCEPTABLE_DELTA_T);
             // 处理首次连接或时间戳回绕（如果发生的话）
             if delta_t <= 0.0 { 
                 // 时间戳没有前进，或者发生了回绕，这会导致 AHRS 异常
@@ -175,14 +222,17 @@ impl ControllerParser {
         self.last_sensor_time = Some(current_sensor_time_seconds); 
 
         // 归一化加速度计数据 
-        let nalgebra_accel = accelerometer.normalize();
+        let nalgebra_accel = current_accel_filtered.normalize();
 
+        // smoothed_delta_t 用于计算 AHRS 的 sample_period，以平滑过渡。
+        let alpha = self.config.delta_t_smoothing_alpha;
+        self.smoothed_delta_t = alpha * delta_t + (1.0 - alpha) * self.smoothed_delta_t;
         // 使用ahrs feature field_access
         let sample_period_ref: &mut f64 = self.ahrs_filter.sample_period_mut();
-        *sample_period_ref = delta_t;
+        *sample_period_ref = self.smoothed_delta_t;
 
         // 更新 AHRS 滤波器。
-        let update_result = self.ahrs_filter.update(&gyroscope, &nalgebra_accel, &magnetometer);
+        let update_result = self.ahrs_filter.update(&current_gyro_filtered, &nalgebra_accel, &current_mag_filtered);
         // 如果更新失败，打印错误并返回 None（或保留上次的姿态）
         if let Err(e) = update_result {
             eprintln!("AHRS update failed: {:?}", e); 
