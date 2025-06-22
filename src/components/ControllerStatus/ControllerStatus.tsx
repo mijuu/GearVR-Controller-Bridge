@@ -19,27 +19,10 @@ export interface ControllerState {
         x: number;
         y: number;
     };
-    orientation: {
-        x: number;
-        y: number;
-        z: number;
-        w: number;
-    };
-    accelerometer: {
-        x: number;
-        y: number;
-        z: number;
-    };
-    gyroscope: {
-        x: number;
-        y: number;
-        z: number;
-    };
-    magnetometer: {
-        x: number;
-        y: number;
-        z: number;
-    };
+    orientation: [number, number, number, number];
+    accelerometer: [number, number, number];
+    gyroscope: [number, number, number];
+    magnetometer: [number, number, number];
     temperature: number;
 }
 

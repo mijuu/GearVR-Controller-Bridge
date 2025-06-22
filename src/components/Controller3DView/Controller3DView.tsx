@@ -42,8 +42,9 @@ function Model({ state }: { state: ControllerState | null }) {
   // 更新模型旋转
   useFrame(() => {
     if (state && groupRef.current) {
-      const { x, y, z, w } = state.orientation;
-      quaternion.set(x, y, z, w);
+      const [ x, y, z, w ] = state.orientation;
+      // quaternion.set(x, y, z, w);
+      quaternion.set(x, z, -y, w);
       euler.setFromQuaternion(quaternion);
       groupRef.current.rotation.set(euler.x, euler.y, euler.z);
     }
