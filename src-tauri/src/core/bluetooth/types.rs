@@ -34,14 +34,6 @@ impl BluetoothDevice {
             is_connected,
         }
     }
-
-    /// Returns true if this device is a GearVR Controller
-    pub fn is_gear_vr_controller(&self, controller_name: &str) -> bool {
-        self.name
-            .as_ref()
-            .map(|name| name.contains(controller_name))
-            .unwrap_or(false)
-    }
 }
 
 /// Represents the state of a successfully connected device.

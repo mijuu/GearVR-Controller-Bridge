@@ -80,3 +80,14 @@ pub async fn disconnect(device_id: String, state: State<'_, AppState>) -> Result
     
     bluetooth_manager.disconnect(&device_id).await.map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn turn_off_controller(state: State<'_, AppState>) -> Result<(), String> {
+    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
+    let bluetooth_manager = {
+        let guard = state.bluetooth().map_err(|e| e.to_string())?;
+        guard.as_ref().unwrap().clone()
+    };
+    
+    bluetooth_manager.turn_off_controller().await.map_err(|e| e.to_string())
+}

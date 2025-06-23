@@ -8,7 +8,7 @@ pub mod state;
 pub mod logging;
 
 // Import our modules
-use commands::{connect_to_device, disconnect, scan_devices_realtime};
+use commands::{connect_to_device, disconnect, scan_devices_realtime, turn_off_controller};
 use state::AppState;
 use tauri::Manager;
 
@@ -21,6 +21,7 @@ pub fn run() {
             scan_devices_realtime,
             connect_to_device,
             disconnect,
+            turn_off_controller,
         ])
         // Setup our application state
         .setup(|app| {

@@ -64,7 +64,7 @@ impl<T: CommandSender> CommandExecutor<T> {
         Self { command_sender }
     }
 
-    pub async fn off(&self) -> Result<()> {
+    pub async fn turn_off_controller(&self) -> Result<()> {
         info!("Turning off controller");
         self.command_sender.send_command(ControllerCommand::Off).await?;
         Ok(())
@@ -81,6 +81,9 @@ impl<T: CommandSender> CommandExecutor<T> {
             ControllerCommand::Sensor
         };
 
+        // disable LPM mode
+        self.command_sender.send_command(ControllerCommand::LpmEnable).await?;
+        // self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
         self.command_sender.send_command(command).await?;
         
         // Wait for command to take effect

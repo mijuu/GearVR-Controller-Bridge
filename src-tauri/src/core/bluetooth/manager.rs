@@ -70,11 +70,62 @@ impl BluetoothManager {
         let re = Regex::new(r"([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})").unwrap();
         re.find(device_id_str).map(|mat| mat.as_str().to_string().to_uppercase())
     }
+    
+    /// Returns true if this device is a GearVR Controller
+    fn is_gear_vr_controller(&self, device: &Device) -> bool {
+        device.name()
+            .ok()
+            .as_ref()
+            .map(|name| name.contains(CONTROLLER_NAME))
+            .unwrap_or(false)
+    }
+
+    /// Emits a device-found event
+    async fn emit_device_found(&self, window: Window, device: Device) -> Result<()>{
+        let name = device.name().ok().or_else(|| Some("None".to_string()));
+        let id = device.id().to_string();
+        let rssi = device.rssi().await.ok().or_else(|| Some(0));
+        let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
+        let is_paired = device.is_paired().await.unwrap_or(false);
+        let is_connected = device.is_connected().await;
+        let battery_level = None;
+        
+        let bluetooth_device = BluetoothDevice::new(
+            id.clone(), name.clone(), Some(address.clone()), rssi,
+            battery_level, Some(is_paired), Some(is_connected
+        ));
+        info!("Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, 
+            Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
+            address, id, name, rssi, battery_level, is_paired, is_connected
+        );
+
+        {
+            let mut devices: std::sync::MutexGuard<'_, HashMap<String, Device>> = self.devices.lock().unwrap();
+            devices.insert(id.clone(), device.clone());
+        }
+
+        if let Err(e) = window.emit("device-found", bluetooth_device) {
+            error!("Failed to emit device-found event: {}", e);
+        }
+        Ok(())
+    }
 
     /// Scans for Bluetooth devices using bluest library
     pub async fn scan_devices_realtime(&self, window: Window, duration_secs: u64) -> Result<()> {
         // Clear existing devices
         self.devices.lock().unwrap().clear();
+
+        // find connected device first
+        info!("Checking for connected devices");
+        let connected_devices = self.adapter.connected_devices().await?;
+        for device in connected_devices {
+            if self.is_gear_vr_controller(&device) {
+                info!("Found connected Gear VR Controller device");
+                self.emit_device_found(window.clone(), device).await?;
+                return Ok(());
+            }
+        }
+        info!("No connected Gear VR Controller detected");
 
         info!("Starting bluetooth scan for {} seconds", duration_secs);
         let mut scan = self.adapter.scan(&[]).await?;
@@ -94,34 +145,15 @@ impl BluetoothManager {
             match timeout(remaining_time, scan.next()).await {
                 Ok(Some(discovered_device)) => {
                     let device = discovered_device.device;
-                    let name = discovered_device.adv_data.local_name;
-                    let id = device.id().to_string();
                     let rssi = discovered_device.rssi;
-                    let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
-                    let is_paired = device.is_paired().await.unwrap_or(false);
-                    let is_connected = device.is_connected().await;
-                    let battery_level = None;
                     
                     // Print all discovered devices for debugging
-                    debug!("Found device - Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
-                        address, id, name, rssi, is_paired, is_connected);
-
+                    debug!("Found device - Device: {:?}, RSSI: {:?}",  device, rssi);
                     // Only include devices with medium or stronger signal strength
                     if let Some(signal_strength) = rssi {
                         if signal_strength >= MIN_RSSI_THRESHOLD {
-                            let bluetooth_device = BluetoothDevice::new(id.clone(), name.clone(), Some(address.clone()), rssi, battery_level, Some(is_paired), Some(is_connected));
-                            if bluetooth_device.is_gear_vr_controller(CONTROLLER_NAME) {
-                                info!("Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
-                        address, id, name, rssi, battery_level, is_paired, is_connected);
-
-                                {
-                                    let mut devices: std::sync::MutexGuard<'_, HashMap<String, Device>> = self.devices.lock().unwrap();
-                                    devices.insert(id.clone(), device.clone());
-                                }
-
-                                if let Err(e) = window.emit("device-found", bluetooth_device) {
-                                    error!("Failed to emit device-found event: {}", e);
-                                }
+                            if self.is_gear_vr_controller(&device) {
+                                self.emit_device_found(window.clone(), device).await?;
                                 break;
                             }
                         }
@@ -192,8 +224,20 @@ impl BluetoothManager {
         };
 
         self.connection_manager.disconnect(&device).await?;
-
         Ok(())
+    }
+
+    /// turn off the controller
+    pub async fn turn_off_controller(&self) -> Result<()> {
+        let connected_state = {
+            let connected = self.connected_state.lock().unwrap();
+            connected.clone().ok_or_else(|| anyhow!("No device connected"))?
+        };
+
+        let command_sender = BluestCommandSender::new(connected_state.write_characteristic.clone());
+        let command_executor = CommandExecutor::new(command_sender);
+
+        command_executor.turn_off_controller().await
     }
 
     /// Calibrate the controller
@@ -256,28 +300,4 @@ impl BluetoothManager {
         Ok(Some(battery_data[0]))
     }
 
-    pub async fn read_controller_data(&self, window: Window) -> Result<()> {
-        let connected_state = {
-            let connected = self.connected_state.lock().unwrap();
-            connected.clone().ok_or_else(|| anyhow!("No device connected"))?
-        };
-        
-        self.notification_handler.setup_notifications(connected_state.notify_characteristic.clone(), window).await?;
-        Ok(())
-    }
-
-    pub async fn check_controller_status(&self, device_id: &str) -> Result<()> {
-        let device = {
-            let devices = self.devices.lock().unwrap();
-            devices
-                .get(device_id)
-                .cloned()
-                .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
-        };
-
-        let is_connected = device.is_connected().await;
-        info!("Device is connected {}", is_connected);
-        Ok(())
-    }
-        
 }

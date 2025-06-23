@@ -180,6 +180,7 @@ impl ControllerParser {
             i16::from_le_bytes([data[14], data[15]]) as f64 * gyr_val_factor,
         );
 
+        // 32-37， 48-53？
         let mag_val_factor = 0.06;
         let magnetometer = Vector3::new(
             i16::from_le_bytes([data[48], data[49]]) as f64 * mag_val_factor,
