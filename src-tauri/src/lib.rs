@@ -10,10 +10,13 @@ pub mod logging;
 // Import our modules
 use commands::{connect_to_device, disconnect, scan_devices_realtime, turn_off_controller};
 use state::AppState;
+use log::{info};
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         // Register our commands
@@ -24,9 +27,14 @@ pub fn run() {
             turn_off_controller,
         ])
         // Setup our application state
-        .setup(|app| {
+        .setup(move |app| {
             // Create and manage our application state
-            app.manage(AppState::new());
+            let app_state_instance = rt.block_on(async {
+                info!("Starting AppState initialization in Tauri setup.");
+                AppState::new().await.expect("Failed to initialize AppState with BluetoothManager")
+            });
+
+            app.manage(app_state_instance);
             
             // 初始化自定义日志处理器
             if let Err(_) = logging::TauriLogger::init(app.handle().clone(), log::Level::Info) {

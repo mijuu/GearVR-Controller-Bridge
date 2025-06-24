@@ -2,7 +2,8 @@
 //! This module defines all the commands that can be invoked from the frontend.
 
 use crate::state::AppState;
-use tauri::{Emitter, State, Window};
+use anyhow::{Result};
+use tauri::{State, Window};
 
 /// Connects to a Bluetooth device
 ///
@@ -14,15 +15,12 @@ use tauri::{Emitter, State, Window};
 pub async fn connect_to_device(
     device_id: String,
     window: Window,
-    state: State<'_, AppState>,
+    app_state: State<'_, AppState>,
 ) -> Result<(), String> {
-    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
-    let bluetooth_manager = {
-        let guard = state.bluetooth().map_err(|e| e.to_string())?;
-        guard.as_ref().unwrap().clone()
-    };
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    bluetooth_manager.connect_device(&device_id, window).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.connect_device(window, &device_id).await.map_err(|e| e.to_string())
 }
 
 /// Scans for Bluetooth devices with real-time updates through events
@@ -41,29 +39,15 @@ pub async fn connect_to_device(
 pub async fn scan_devices_realtime(
     window: Window,
     duration_secs: Option<u64>,
-    state: State<'_, AppState>,
+    app_state: State<'_, AppState>,
 ) -> Result<(), String> {
     // Default scan duration is 5 seconds
     let duration = duration_secs.unwrap_or(5);
     
-    // Initialize Bluetooth if not already initialized
-    if state.bluetooth().is_err() {
-        state.init_bluetooth().await.map_err(|e| e.to_string())?;
-    }
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
-    let bluetooth_manager = {
-        let guard = state.bluetooth().map_err(|e| e.to_string())?;
-        guard.as_ref().unwrap().clone()
-    };
-    
-    // Emit scan-start event
-    if let Err(e) = window.emit("scan-start", ()) {
-        eprintln!("Failed to emit scan-start event: {}", e);
-    }
-    
-    // Perform the real-time scan
-    bluetooth_manager.scan_devices_realtime(window, duration).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.scan_devices_realtime(window, duration).await.map_err(|e| e.to_string())
 }
 
 /// Disconnects from the currently connected device
@@ -71,23 +55,17 @@ pub async fn scan_devices_realtime(
 /// # Arguments
 /// * `state` - The application state
 #[tauri::command]
-pub async fn disconnect(device_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
-    let bluetooth_manager = {
-        let guard = state.bluetooth().map_err(|e| e.to_string())?;
-        guard.as_ref().unwrap().clone()
-    };
+pub async fn disconnect(window: Window, device_id: String, app_state: State<'_, AppState>) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    bluetooth_manager.disconnect(&device_id).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.disconnect(window, &device_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn turn_off_controller(state: State<'_, AppState>) -> Result<(), String> {
-    // Clone the BluetoothManager to avoid holding the MutexGuard across an await point
-    let bluetooth_manager = {
-        let guard = state.bluetooth().map_err(|e| e.to_string())?;
-        guard.as_ref().unwrap().clone()
-    };
+pub async fn turn_off_controller(app_state: State<'_, AppState>) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    bluetooth_manager.turn_off_controller().await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.turn_off_controller().await.map_err(|e| e.to_string())
 }

@@ -1,43 +1,30 @@
 //! Application state management
 //! This module defines and manages the global application state.
 
-use std::sync::Mutex;
+use std::sync::{Arc};
+use tokio::sync::Mutex;
+use anyhow::{Result};
+use log::{info};
 use crate::core::BluetoothManager;
 
 /// Global application state
 pub struct AppState {
     /// The Bluetooth manager instance
-    bluetooth: Mutex<Option<BluetoothManager>>,
+    pub bluetooth_manager: Arc<Mutex<BluetoothManager>>,
 }
 
 impl AppState {
     /// Creates a new AppState instance
-    pub fn new() -> Self {
-        Self {
-            bluetooth: Mutex::new(None),
-        }
-    }
-
-    /// Initializes the Bluetooth manager
-    pub async fn init_bluetooth(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let bluetooth = BluetoothManager::new().await?;
-        *self.bluetooth.lock().unwrap() = Some(bluetooth);
-        Ok(())
+    pub async fn new() -> Result<Self> {
+        info!("Initializing BluetoothManager...");
+        let manager = BluetoothManager::new().await?;
+        Ok(Self {
+            bluetooth_manager: Arc::new(Mutex::new(manager)),
+        })
     }
 
     /// Gets a reference to the Bluetooth manager
-    pub fn bluetooth(&self) -> Result<std::sync::MutexGuard<Option<BluetoothManager>>, Box<dyn std::error::Error>> {
-        let guard = self.bluetooth.lock().unwrap();
-        if guard.is_none() {
-            return Err("Bluetooth manager not initialized".into());
-        }
-        Ok(guard)
-    }
-}
-
-// Implement Default for AppState
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
+    pub fn get_bluetooth_manager_arc(&self) -> Arc<Mutex<BluetoothManager>> {
+        self.bluetooth_manager.clone()
     }
 }
