@@ -3,13 +3,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 // Define Bluetooth device type
-interface BluetoothDevice {
-  name?: string;
+export interface BluetoothDevice {
+  name: string;
   address: string;
   id: string;
-  rssi?: number;
-  is_paired?: boolean;
-  is_connected?: boolean;
+  rssi: number;
+  is_paired: boolean;
+  is_connected: boolean;
 }
 
 const DeviceList: React.FC = () => {
@@ -39,16 +39,27 @@ const DeviceList: React.FC = () => {
     });
 
     // Update device status
-    const updateDeviceUnlisten = listen<BluetoothDevice>('update-device', (event) => {
-      const newDevice = event.payload;
+    const updateConnectedUnlisten = listen<BluetoothDevice>('device-connected', (event) => {
+      const { id } = event.payload;
       setDevices((currentDevices) => {
           // Update existing device
           return currentDevices.map(device => 
-            device.id === newDevice.id ? {...device , ...newDevice} : device
+            device.id === id ? {...device , is_connected: true} : device
           );
       });
     });
     
+    // Update device status
+    const updateDisconnectedUnlisten = listen<BluetoothDevice>('device-disconnected', (event) => {
+      const { id } = event.payload;
+      setDevices((currentDevices) => {
+          // Update existing device
+          return currentDevices.map(device => 
+            device.id === id ? {...device , is_connected: false} : device
+          );
+      });
+    });
+
     // Listen for scan completion event
     const scanCompleteUnlisten = listen('scan-complete', () => {
       setIsScanning(false);
@@ -63,7 +74,8 @@ const DeviceList: React.FC = () => {
     // Cleanup function
     return () => {
       deviceFoundUnlisten.then(unlisten => unlisten());
-      updateDeviceUnlisten.then(unlisten => unlisten());
+      updateConnectedUnlisten.then(unlisten => unlisten());
+      updateDisconnectedUnlisten.then(unlisten => unlisten());
       scanCompleteUnlisten.then(unlisten => unlisten());
       scanErrorUnlisten.then(unlisten => unlisten());
     };
@@ -129,7 +141,7 @@ const DeviceList: React.FC = () => {
 
   // Render signal strength indicator
   const renderSignalStrength = (rssi?: number) => {
-    if (!rssi) return '无信号';
+    if (!rssi) return '--';
     if (rssi > -50) return '强';
     if (rssi > -70) return '中';
     return '弱';
@@ -195,14 +207,6 @@ const DeviceList: React.FC = () => {
               </div>
               <div className="signal-strength">
                 信号: {renderSignalStrength(device.rssi)}
-              </div>
-              <div className="device-status">
-                {device.is_paired && (
-                  <span className="status-badge paired">已配对</span>
-                )}
-                {device.is_connected && (
-                  <span className="status-badge connected">已连接</span>
-                )}
               </div>
             </div>
             <div className="device-actions">
@@ -303,27 +307,6 @@ const DeviceList: React.FC = () => {
           color: #28a745;
           font-size: 0.9rem;
           margin-bottom: 0.25rem;
-        }
-
-        .device-status {
-          display: flex;
-          gap: 0.5rem;
-          margin-top: 0.25rem;
-        }
-
-        .status-badge {
-          font-size: 0.8rem;
-          padding: 0.2rem 0.4rem;
-          border-radius: 4px;
-          color: white;
-        }
-
-        .status-badge.paired {
-          background-color: #6c757d;
-        }
-
-        .status-badge.connected {
-          background-color: #17a2b8;
         }
 
         .device-actions {

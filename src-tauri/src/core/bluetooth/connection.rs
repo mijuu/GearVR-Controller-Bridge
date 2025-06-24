@@ -7,7 +7,6 @@ use log::{info, warn, error};
 use std::time::Duration;
 use tauri::{Window, Emitter};
 
-use crate::core::bluetooth::types::{BluetoothDevice};
 use crate::core::bluetooth::notification::NotificationHandler;
 use crate::core::bluetooth::{commands::{CommandExecutor, CommandSender, ControllerCommand}};
 
@@ -29,7 +28,7 @@ impl ConnectionManager {
         &self,
         device: &Device,
         window: &Window,
-        notification_handler: &NotificationHandler,
+        notification_handler: &mut NotificationHandler,
         controller_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
@@ -71,7 +70,7 @@ impl ConnectionManager {
         &self,
         device: &Device,
         window: &Window,
-        notification_handler: &NotificationHandler,
+        notification_handler: &mut NotificationHandler,
         controller_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
@@ -80,14 +79,16 @@ impl ConnectionManager {
         let id = device.id().to_string();
         info!("Device details - ID: {}, Name: {:?}", id, name);
 
-
-        if !device.is_connected().await {
-            info!("Initiating connection to {}...", id);
-            self.adapter.connect_device(&device).await?;
+        // On Windows, device connections are automatically managed by the OS. 
+        if cfg!(not(target_os = "windows")) {
+            if !device.is_connected().await {
+                info!("Initiating connection to {}...", id);
+                self.adapter.connect_device(&device).await?;
+                info!("Connection successful");
+            }
         }
         
-        
-        info!("Connection successful, discovering services...");
+        info!("Discovering services...");
         let services = device.services().await?;
         let controller_service = services
             .iter()
@@ -128,31 +129,43 @@ impl ConnectionManager {
         // 设置通知监听
         info!("Setting up notifications...");
         notification_handler.setup_notifications(
-            notify_char_for_task,
             window.clone(),
+            notify_char_for_task,
         ).await?;
 
         info!("Initializing controller in sensor mode...");
         command_executor.initialize_controller(false).await?;
-        info!("Controller initialized successfully in sensor mode");
 
         // info!("Starting keepalive timer...");
         // command_executor.start_keepalive_timer(60);
 
         info!("Connection and setup process completed successfully");
-        let bluetooth_device = BluetoothDevice::new(id,Some(name), None, None, None, Some(true), Some(true));
-        if let Err(e) = window.emit("update-device", bluetooth_device) {
-            error!("Failed to emit update-device event: {}", e);
+        let payload = serde_json::json!({
+            "id": id,
+            "name": name,
+        });
+        if let Err(e) = window.emit("device-connected", payload) {
+            error!("Failed to emit device-connected event: {}", e);
         }
         Ok((notify_char, write_char))
     }
 
     /// Disconnect from the controller (bluest version)
-    pub async fn disconnect(&self, device: &Device) -> Result<()> {
+    pub async fn disconnect(&self, window: Window, device: &Device) -> Result<()> {
         if device.is_connected().await {
             info!("Disconnecting from device {}", device.id());
-            self.adapter.disconnect_device(device).await?;
+            if cfg!(target_os = "windows") {
+                info!("Windows does not support disconnecting from device, So we do nothing")
+            } else {
+                self.adapter.disconnect_device(device).await?;
+            }
             info!("Successfully disconnected");
+            let payload = serde_json::json!({
+                "id": device.id().to_string(),
+            });
+            if let Err(e) = window.emit("device-disconnected", payload) {
+                error!("Failed to emit device-disconnected event: {}", e);
+            }
         } else {
             info!("Device {} not connected", device.id());
         }
@@ -162,7 +175,6 @@ impl ConnectionManager {
 
 #[derive(Clone)]
 pub struct BluestCommandSender {
-    // 不再需要整个 device 对象，只需要写入特征
     write_char: bluest::Characteristic,
 }
 
@@ -177,8 +189,6 @@ impl CommandSender for BluestCommandSender {
     async fn send_command(&self, command: ControllerCommand) -> Result<()> {
         let data = command.to_bytes();
         
-        // bluest 的写入非常直接，在特征上调用 .write() 即可
-        // 它不需要像 btleplug 那样手动指定 WriteType
         info!("Sending command to controller: {:?}", command);
         self.write_char.write(&data).await?;
         

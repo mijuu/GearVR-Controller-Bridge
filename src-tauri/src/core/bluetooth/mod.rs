@@ -7,6 +7,7 @@ mod connection;
 mod constants;
 mod types;
 mod manager;
+mod scanner;
 mod notification;
 
 // Re-export types that should be publicly accessible
@@ -15,4 +16,5 @@ pub use connection::ConnectionManager;
 pub use constants::*;  // Re-export all constants
 pub use types::{BluetoothDevice, ConnectedDeviceState};
 pub use manager::BluetoothManager;
+pub use scanner::BluetoothScanner;
 pub use notification::NotificationHandler;

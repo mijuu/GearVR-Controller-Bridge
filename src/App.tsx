@@ -118,9 +118,11 @@ function App() {
           <div className="device-list-container">
             <DeviceList />
           </div>
-          <div className="controller-status-container">
-            <ControllerStatus />
-          </div>
+          {isConnected && (
+            <div className="controller-status-container">
+              <ControllerStatus />
+            </div>
+          )}
         </div>
         {showLogs && (
           <div className="log-overlay">
