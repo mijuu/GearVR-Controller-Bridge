@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import DeviceList from "./components/DeviceList";
-import ControllerStatus from "./components/ControllerStatus/ControllerStatus";
+import MainView from "./components/MainView";
 import StatusBar from "./components/StatusBar";
 import LogViewer from "./components/LogViewer";
 import { LogMessage } from "./components/LogViewer";
@@ -114,16 +113,7 @@ function App() {
       </header>
 
       <main className="app-content">
-        <div className="content-grid">
-          <div className="device-list-container">
-            <DeviceList />
-          </div>
-          {isConnected && (
-            <div className="controller-status-container">
-              <ControllerStatus />
-            </div>
-          )}
-        </div>
+        <MainView />
         {showLogs && (
           <div className="log-overlay">
             <LogViewer logs={logs} onClearLogs={clearLogs} />
@@ -145,13 +135,15 @@ function App() {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          background-color: #f5f5f5;
+          background-color: #121212;
+          color: #ffffff;
         }
 
         .app-header {
           padding: 1rem;
           background-color: #1a1a1a;
-          color: white;
+          color: #00ffcc;
+          border-bottom: 1px solid #333;
         }
 
         .app-header h1 {
@@ -163,7 +155,7 @@ function App() {
         .error-banner {
           margin-top: 0.5rem;
           padding: 0.5rem;
-          background-color: #dc3545;
+          background-color: #ff0033;
           color: white;
           border-radius: 4px;
           font-size: 0.9rem;
@@ -171,34 +163,23 @@ function App() {
 
         .app-content {
           flex: 1;
-          overflow-y: auto;
-          padding: 1rem;
-        }
-
-        .content-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-        }
-
-        @media (max-width: 1200px) {
-          .content-grid {
-            grid-template-columns: 1fr;
-          }
+          overflow: hidden;
+          position: relative;
+          height: calc(100vh - 120px); /* 减去header和footer的高度 */
         }
 
         .app-footer {
-          border-top: 1px solid #ddd;
-          background-color: white;
+          border-top: 1px solid #333;
+          background-color: #1a1a1a;
         }
 
         .log-overlay {
           position: fixed;
           left: 0;
           right: 0;
-          bottom: 40px; /* StatusBar的高度，确保不会遮挡到它 */
-          top: 250px; /* 留出顶部空间显示设备列表第一项 */
-          background-color: rgba(245, 245, 245, 0.98);
+          bottom: 40px;
+          top: 0;
+          background-color: rgba(18, 18, 18, 0.98);
           backdrop-filter: blur(5px);
           z-index: 1000;
           padding: 0 1rem;
@@ -206,8 +187,8 @@ function App() {
           flex-direction: column;
           pointer-events: all;
           transition: all 0.3s ease;
-          box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
-          border-top: 1px solid rgba(0, 0, 0, 0.1);
+          box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.3);
+          border-top: 1px solid rgba(0, 255, 204, 0.1);
           animation: slideIn 0.3s ease;
         }
 
@@ -232,25 +213,6 @@ function App() {
         .log-overlay .log-content {
           max-height: none !important;
           height: calc(100% - 40px) !important;
-        }
-
-        /* 响应式调整 */
-        @media (max-height: 600px) {
-          .log-overlay {
-            top: 100px; /* 在小屏幕上减少顶部空间 */
-          }
-        }
-
-        @media (max-height: 500px) {
-          .log-overlay {
-            top: 80px; /* 在更小的屏幕上进一步减少顶部空间 */
-          }
-        }
-
-        @media (max-width: 768px) {
-          .log-overlay {
-            padding: 0 0.5rem; /* 在窄屏幕上减少水平内边距 */
-          }
         }
       `}</style>
     </div>
