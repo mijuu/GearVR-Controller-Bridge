@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -15,6 +15,7 @@ const MainView: React.FC = () => {
   const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected'>('searching');
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showController, setShowController] = useState(false);
 
   // Text animation variants
   const textVariants = {
@@ -23,25 +24,32 @@ const MainView: React.FC = () => {
     exit: { y: -20, opacity: 0 }
   };
 
-  // Track scanning state
-  const [isScanning, setIsScanning] = useState(false);
+  const effectRan = useRef(false);
+
+  // Show controller view when connected
+  useEffect(() => {
+    if (status !== 'connected') 
+      return;
+
+    const timer = setTimeout(() => {
+      setShowController(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [status]);
 
   // Start device search on mount
   useEffect(() => {
+    if (effectRan.current) return;
+  
     const searchDevices = async () => {
-      if (isScanning) return;
-      
       try {
-        setIsScanning(true);
         setStatus('searching');
-        const res = await invoke('scan_devices_realtime', { durationSecs: 5 });
-        console.log('scan', res);
-        
+        await invoke('start_scan');
       } catch (err) {
         console.error('scan', err);
         
         setError(`搜索失败: ${err}`);
-        setIsScanning(false);
       }
     };
 
@@ -67,19 +75,19 @@ const MainView: React.FC = () => {
     const connectUnlisten = listen<{id: string}>('device-connected', () => {
       setStatus('connected');
     });
-console.log(111);
+
+    effectRan.current = true;
 
     searchDevices();
 
     return () => {
       // Stop scanning when component unmounts
-      if (isScanning) {
-        invoke('stop_scan').catch(console.error);
-      }
+      invoke('stop_scan').catch(console.error);
+
       deviceFoundUnlisten.then(f => f());
       connectUnlisten.then(f => f());
     };
-  }, [isScanning]);
+  }, []);
 
   const connectToDevice = async (deviceId: string) => {
     try {
@@ -100,7 +108,7 @@ console.log(111);
     }
   };
 
-  if (status === 'connected' && device) {
+  if (showController && device) {
     return <ControllerStatus />;
   }
 
@@ -108,7 +116,7 @@ console.log(111);
     <div className="main-view" style={{
       background: '#121212',
       color: '#00ffcc',
-      height: '100vh',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -204,11 +212,24 @@ console.log(111);
             style={{ zIndex: 1, textAlign: 'center' }}
           >
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接中...</h1>
-            <p>正在连接到设备</p>
+            <p>{'正在连接到 ' + device?.name}</p>
+          </motion.div>
+        )}
+
+        {status === 'connected' && (
+          <motion.div
+            key="connected"
+            variants={textVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ zIndex: 1, textAlign: 'center' }}
+          >
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接成功!</h1>
+            <p>进入控制模式</p>
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Error message */}
       {error && (
         <motion.div

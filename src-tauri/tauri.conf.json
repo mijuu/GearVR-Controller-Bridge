@@ -13,8 +13,9 @@
     "windows": [
       {
         "title": "GearVR Controller Bridge",
-        "width": 800,
-        "height": 600
+        "backgroundColor": "#121212",
+        "width": 900,
+        "height": 712
       }
     ],
     "security": {

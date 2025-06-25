@@ -36,8 +36,9 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           align-items: center;
           justify-content: space-between;
           padding: 0.5rem 1rem;
-          background-color: #f8f9fa;
-          border-top: 1px solid #ddd;
+          color: #444;
+          /* background-color: #f8f9fa; */
+          /* border-top: 1px solid #ddd; */
           font-size: 0.9rem;
         }
 

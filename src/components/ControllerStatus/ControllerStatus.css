@@ -1,10 +1,8 @@
 .controller-status {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: #e0e0e0;
-    background-color: #2a2a2a;
+    background-color: #121212;
     padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     max-width: 800px;
     margin: 0 auto;
 }

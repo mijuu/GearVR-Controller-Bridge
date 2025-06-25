@@ -140,6 +140,7 @@ function App() {
         }
 
         .app-header {
+          display: none;
           padding: 1rem;
           background-color: #1a1a1a;
           color: #00ffcc;
@@ -169,8 +170,8 @@ function App() {
         }
 
         .app-footer {
-          border-top: 1px solid #333;
-          background-color: #1a1a1a;
+          /* border-top: 1px solid #333; */
+          /* background-color: #1a1a1a; */
         }
 
         .log-overlay {
@@ -178,7 +179,7 @@ function App() {
           left: 0;
           right: 0;
           bottom: 40px;
-          top: 0;
+          top: 40px;
           background-color: rgba(18, 18, 18, 0.98);
           backdrop-filter: blur(5px);
           z-index: 1000;

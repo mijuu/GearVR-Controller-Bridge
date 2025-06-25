@@ -72,7 +72,6 @@ export default function ControllerStatus() {
 
     return (
         <div className="controller-status">
-            <h2>控制器状态</h2>
             <div className="top-section">
                 <div className="model-view">
                     <Canvas>
@@ -91,7 +90,7 @@ export default function ControllerStatus() {
                                 }}
                             ></div>
                             <div className="touchpad-coords">
-                                <span>X: {state.touchpad.x.toFixed(2)}</span>
+                                <span>X: {state.touchpad.x.toFixed(2)} </span>
                                 <span>Y: {state.touchpad.y.toFixed(2)}</span>
                             </div>
                         </div>
