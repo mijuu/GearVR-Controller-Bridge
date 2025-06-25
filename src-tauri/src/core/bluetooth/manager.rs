@@ -120,7 +120,7 @@ impl BluetoothManager {
                 .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
         };
 
-        self.notification_handler.abort_notifications();
+        self.notification_handler.abort_notifications().await?;
         // drop ConnectedDeviceState
         {
             let mut connected_state_guard = self.connected_state.lock().unwrap();

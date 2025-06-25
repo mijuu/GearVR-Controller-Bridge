@@ -21,7 +21,7 @@ pub struct BluetoothScanner {
     adapter: Adapter,
     devices: Arc<Mutex<HashMap<String, Device>>>,
     cancel_token: Arc<CancellationToken>,
-    scan_task_handle: Option<JoinHandle<Result<()>>>,
+    task_handle: Option<JoinHandle<Result<()>>>,
 }
 impl BluetoothScanner {
     pub fn new(adapter: Adapter, devices: Arc<Mutex<HashMap<String, Device>>>) -> Self {
@@ -29,13 +29,13 @@ impl BluetoothScanner {
             adapter,
             devices,
             cancel_token: Arc::new(CancellationToken::new()),
-            scan_task_handle: None,
+            task_handle: None,
         }
     }
     pub async fn start_scan(&mut self, window: Window) -> Result<()> {
         // Clear existing devices
         self.devices.lock().unwrap().clear();
-        if self.scan_task_handle.is_some() {
+        if self.task_handle.is_some() {
             self.stop_scan(window.clone()).await?;
         }
 
@@ -58,7 +58,7 @@ impl BluetoothScanner {
             Ok(())
         });
 
-        self.scan_task_handle = Some(handle);
+        self.task_handle = Some(handle);
 
         // Emit scan-start event
         if let Err(e) = window.emit("scan-start", ()) {
@@ -81,7 +81,10 @@ impl BluetoothScanner {
         let connected_devices = adapter.connected_devices().await?;
         for device in connected_devices {
             if BluetoothScanner::is_gear_vr_controller(&device) {
-                BluetoothScanner::emit_device_found(devices, window.clone(), device).await?;
+                // windows & linux NotSupported, and macOS is stuck
+                // let rssi = device.rssi().await?;
+                let rssi: i16 = 0;
+                BluetoothScanner::emit_device_found(window.clone(), devices, device, rssi).await?;
                 if let Err(e) = window.emit("scan-complete", ()) {
                     error!("Failed to emit scan-complete event: {}", e);
                 }
@@ -109,7 +112,7 @@ impl BluetoothScanner {
                             if let Some(signal_strength) = rssi {
                                 if signal_strength >= min_rssi_threshold {
                                     if BluetoothScanner::is_gear_vr_controller(&device) {
-                                        BluetoothScanner::emit_device_found(devices, window.clone(), device).await?;
+                                        BluetoothScanner::emit_device_found(window.clone(), devices, device, signal_strength).await?;
                                         break;
                                     }
                                 }
@@ -138,8 +141,8 @@ impl BluetoothScanner {
         info!("Stopping Bluetooth scan.");
         self.cancel_token.cancel();
 
-                // 等待任务结束
-        if let Some(handle) = self.scan_task_handle.take() {
+        // 等待任务结束
+        if let Some(handle) = self.task_handle.take() {
             info!("Waiting for scan task to finish...");
             // handle.await 会等待任务完成或被取消，并返回 JoinError 或任务的 Result
             
@@ -169,19 +172,23 @@ impl BluetoothScanner {
     }
 
     /// Emits a device-found event
-    async fn emit_device_found(devices: Arc<Mutex<HashMap<String, Device>>>, window: Window, device: Device) -> Result<()>{
+    async fn emit_device_found(
+        window: Window,
+        devices: Arc<Mutex<HashMap<String, Device>>>, 
+        device: Device,
+        rssi: i16
+    ) -> Result<()>{
         let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
         let id = device.id().to_string();
-        let rssi = device.rssi().await.unwrap_or_else(|_| 0);
         let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
         let is_paired = device.is_paired().await.unwrap_or(false);
         let is_connected = device.is_connected().await;
         let battery_level = 0;
-        
         let bluetooth_device = BluetoothDevice::new(
             id.clone(), name.clone(), address.clone(), rssi,
             battery_level, is_paired, is_connected
         );
+
         info!("Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, 
             Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
             address, id, name, rssi, battery_level, is_paired, is_connected

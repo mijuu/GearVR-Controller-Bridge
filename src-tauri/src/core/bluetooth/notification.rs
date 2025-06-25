@@ -6,17 +6,18 @@ use bluest::{Characteristic};
 use futures_util::StreamExt;
 use log::{debug, error, info};
 use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tauri::{Window, Emitter};
 
 use crate::core::controller::ControllerParser;
 
 /// Notification handler for controller data
-#[derive(Clone)]
 pub struct NotificationHandler {
     /// Controller data parser
     controller_parser: Arc<Mutex<ControllerParser>>,
     cancel_token: Arc<CancellationToken>,
+    task_handle: Option<JoinHandle<Result<()>>>,
 }
 
 impl NotificationHandler {
@@ -24,7 +25,8 @@ impl NotificationHandler {
     pub fn new(controller_parser: Arc<Mutex<ControllerParser>>) -> Self {
         Self {
             controller_parser,
-            cancel_token: Arc::new(CancellationToken::new())
+            cancel_token: Arc::new(CancellationToken::new()),
+            task_handle: None,
         }
     }
 
@@ -34,7 +36,9 @@ impl NotificationHandler {
         window: Window,
         notify_char: Characteristic,
     ) -> Result<()> {
-        self.cancel_token.cancel();
+        if self.task_handle.is_some() {
+            self.abort_notifications().await?;
+        }
         self.cancel_token = Arc::new(CancellationToken::new());
 
         info!("Subscribing to notifications...");
@@ -127,8 +131,33 @@ impl NotificationHandler {
         info!("Notification stream ended");
     }
 
-    pub fn abort_notifications(&mut self) {
-        self.cancel_token.cancel();
+    pub async  fn abort_notifications(&mut self) -> Result<()> {
         info!("Aborting notification: Cancel signal sent.");
+        self.cancel_token.cancel();
+
+        // 等待任务结束
+        if let Some(handle) = self.task_handle.take() {
+            info!("Waiting for notification to finish...");
+            // handle.await 会等待任务完成或被取消，并返回 JoinError 或任务的 Result
+            
+            match handle.await {
+                Ok(task_result) => {
+                    match task_result {
+                        Ok(_) => info!("Notification finished successfully after cancellation."),
+                        Err(e) => error!("Notification finished with an error: {:?}", e),
+                    }
+                },
+                Err(e) => {
+                    if e.is_cancelled() {
+                        info!("Notification was cancelled successfully.");
+                    } else {
+                        error!("Notification finished with an unexpected join error: {:?}", e);
+                    }
+                }
+            }
+        } else {
+            info!("No active notification handle found to wait for.");
+        }
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -12,7 +12,7 @@ interface BluetoothDevice {
 }
 
 const MainView: React.FC = () => {
-  const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected'>('searching');
+  const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected' | 'failed'>('searching');
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showController, setShowController] = useState(false);
@@ -24,8 +24,6 @@ const MainView: React.FC = () => {
     exit: { y: -20, opacity: 0 }
   };
 
-  const effectRan = useRef(false);
-
   // Show controller view when connected
   useEffect(() => {
     if (status !== 'connected') 
@@ -33,22 +31,19 @@ const MainView: React.FC = () => {
 
     const timer = setTimeout(() => {
       setShowController(true);
-    }, 1000);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [status]);
 
   // Start device search on mount
-  useEffect(() => {
-    if (effectRan.current) return;
-  
+  useEffect(() => {    
     const searchDevices = async () => {
       try {
-        setStatus('searching');
+        setStatus('searching');        
         await invoke('start_scan');
       } catch (err) {
         console.error('scan', err);
-        
         setError(`搜索失败: ${err}`);
       }
     };
@@ -59,6 +54,7 @@ const MainView: React.FC = () => {
       if (status !== 'searching' || (device && device.id === event.payload.id)) {
         return;
       }
+      
 
       const newDevice = event.payload;
       setDevice(newDevice);
@@ -68,15 +64,15 @@ const MainView: React.FC = () => {
       setTimeout(() => {
         setStatus('connecting');
         connectToDevice(newDevice.id);
-      }, 1000);
+      }, 1500);
     });
 
     // Listen for connection events
     const connectUnlisten = listen<{id: string}>('device-connected', () => {
-      setStatus('connected');
+      setTimeout(() => {
+        setStatus('connected');
+      }, 1500);
     });
-
-    effectRan.current = true;
 
     searchDevices();
 
@@ -104,7 +100,7 @@ const MainView: React.FC = () => {
       } else {
         setError(`连接失败: ${errorMessage}`);
       }
-      setStatus('searching');
+      setStatus('failed');
     }
   };
 
@@ -126,51 +122,53 @@ const MainView: React.FC = () => {
       overflow: 'hidden'
     }}>
       {/* Optimized pulse animation */}
-      <div style={{
-        position: 'fixed',
-        width: '300px',
-        height: '300px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        willChange: 'transform',
-        pointerEvents: 'none'
-      }}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <motion.div
-            key={i}
-            style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '50%',
-              border: '2px solid #00ffcc',
-              position: 'absolute',
-              boxShadow: '0 0 10px #00ffcc',
-              willChange: 'transform, opacity'
-            }}
-            variants={{
-              initial: { 
-                scale: 0.8, 
-                opacity: 0.7,
-                transformOrigin: 'center'
-              },
-              animate: { 
-                scale: 1.5,
-                opacity: 0,
-                transition: {
-                  duration: 2,
-                  delay: i * 0.5,
-                  repeat: Infinity,
-                  ease: "easeOut",
-                  repeatDelay: 0.5
+      {status !== 'failed' && (
+        <div style={{
+          position: 'fixed',
+          width: '300px',
+          height: '300px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          willChange: 'transform',
+          pointerEvents: 'none'
+        }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <motion.div
+              key={i}
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '2px solid #00ffcc',
+                position: 'absolute',
+                boxShadow: '0 0 10px #00ffcc',
+                willChange: 'transform, opacity'
+              }}
+              variants={{
+                initial: { 
+                  scale: 0.8, 
+                  opacity: 0.7,
+                  transformOrigin: 'center'
+                },
+                animate: { 
+                  scale: 1.5,
+                  opacity: 0,
+                  transition: {
+                    duration: 2,
+                    delay: i * 0.5,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                    repeatDelay: 0.5
+                  }
                 }
-              }
-            }}
-            initial="initial"
-            animate="animate"
-          />
-        ))}
-      </div>
+              }}
+              initial="initial"
+              animate="animate"
+            />
+          ))}
+        </div>
+      )}
 
       {/* Status messages */}
       <AnimatePresence mode="wait">
@@ -212,7 +210,7 @@ const MainView: React.FC = () => {
             style={{ zIndex: 1, textAlign: 'center' }}
           >
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接中...</h1>
-            <p>{'正在连接到 ' + device?.name}</p>
+            <p>{'连接 ' + device?.name}</p>
           </motion.div>
         )}
 
@@ -227,6 +225,20 @@ const MainView: React.FC = () => {
           >
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接成功!</h1>
             <p>进入控制模式</p>
+          </motion.div>
+        )}
+
+        {status === 'failed' && (
+          <motion.div
+            key="failed"
+            variants={textVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ zIndex: 1, textAlign: 'center' }}
+          >
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接失败!</h1>
+            <p>点击重新搜索</p>
           </motion.div>
         )}
       </AnimatePresence>
