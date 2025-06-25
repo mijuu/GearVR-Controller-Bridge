@@ -81,9 +81,8 @@ impl<T: CommandSender> CommandExecutor<T> {
             ControllerCommand::Sensor
         };
 
-        // disable LPM mode
-        self.command_sender.send_command(ControllerCommand::LpmEnable).await?;
-        // self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
+        // disable LPM mode for smooth operation
+        self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
         self.command_sender.send_command(command).await?;
         
         // Wait for command to take effect
