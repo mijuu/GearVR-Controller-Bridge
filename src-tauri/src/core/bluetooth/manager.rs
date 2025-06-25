@@ -81,7 +81,9 @@ impl BluetoothManager {
                 .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
         };
 
-        info!("Connecting to device with ID: {}", device_id);
+        if device.is_connected().await {
+            self.disconnect(window.clone(), device_id).await?;
+        }
         
         // Connect to the device with retry mechanism
         let (notify_char, write_char) = self.connection_manager.connect_with_retry(

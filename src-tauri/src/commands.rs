@@ -5,24 +5,6 @@ use crate::state::AppState;
 use anyhow::{Result};
 use tauri::{State, Window};
 
-/// Connects to a Bluetooth device
-///
-/// # Arguments
-/// * `device_id` - The unique identifier of the device to connect to (platform-specific ID)
-/// * `window` - The Tauri window
-/// * `state` - The application state
-#[tauri::command]
-pub async fn connect_to_device(
-    device_id: String,
-    window: Window,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
-    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
-    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.connect_device(window, &device_id).await.map_err(|e| e.to_string())
-}
-
 /// Scans for Bluetooth devices with real-time updates through events
 ///
 /// # Arguments
@@ -48,6 +30,24 @@ pub async fn scan_devices_realtime(
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
     bluetooth_manager_guard.scan_devices_realtime(window, duration).await.map_err(|e| e.to_string())
+}
+
+/// Connects to a Bluetooth device
+///
+/// # Arguments
+/// * `device_id` - The unique identifier of the device to connect to (platform-specific ID)
+/// * `window` - The Tauri window
+/// * `state` - The application state
+#[tauri::command]
+pub async fn connect_to_device(
+    device_id: String,
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    
+    bluetooth_manager_guard.connect_device(window, &device_id).await.map_err(|e| e.to_string())
 }
 
 /// Disconnects from the currently connected device

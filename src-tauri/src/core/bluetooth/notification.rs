@@ -34,7 +34,6 @@ impl NotificationHandler {
         window: Window,
         notify_char: Characteristic,
     ) -> Result<()> {
-        self.abort_notifications();
         self.cancel_token = Arc::new(CancellationToken::new());
 
         info!("Subscribing to notifications...");

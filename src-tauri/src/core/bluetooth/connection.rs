@@ -77,7 +77,7 @@ impl ConnectionManager {
     ) -> Result<(Characteristic, Characteristic)> {
         let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
         let id = device.id().to_string();
-        info!("Device details - ID: {}, Name: {:?}", id, name);
+        info!("Connecting to device - ID: {}, Name: {:?}", id, name);
 
         // On Windows, device connections are automatically managed by the OS. 
         if cfg!(not(target_os = "windows")) {
