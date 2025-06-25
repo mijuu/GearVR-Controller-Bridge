@@ -9,7 +9,6 @@ use tauri::{State, Window};
 ///
 /// # Arguments
 /// * `window` - The Tauri window
-/// * `duration_secs` - The duration of the scan in seconds
 /// * `state` - The application state
 ///
 /// # Returns
@@ -18,19 +17,27 @@ use tauri::{State, Window};
 /// - "device-found" with device details when a device is discovered
 /// - "scan-complete" when scanning is finished
 #[tauri::command]
-pub async fn scan_devices_realtime(
+pub async fn start_scan(
     window: Window,
-    duration_secs: Option<u64>,
     app_state: State<'_, AppState>,
-) -> Result<(), String> {
-    // Default scan duration is 5 seconds
-    let duration = duration_secs.unwrap_or(5);
-    
+) -> Result<(), String> {    
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
-    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    bluetooth_manager_guard.scan_devices_realtime(window, duration).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.start_scan(window).await.map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn stop_scan(
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {    
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    
+    bluetooth_manager_guard.stop_scan(window).await.map_err(|e| e.to_string())
+}
+
 
 /// Connects to a Bluetooth device
 ///

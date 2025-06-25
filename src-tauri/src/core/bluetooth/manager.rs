@@ -26,7 +26,6 @@ use crate::core::bluetooth::constants::{
 use crate::core::controller::ControllerParser;
 
 /// Manages Bluetooth operations
-#[derive(Clone)]
 pub struct BluetoothManager {
     /// The Bluetooth adapter
     // adapter: Adapter,
@@ -67,8 +66,12 @@ impl BluetoothManager {
     }
 
     /// Scans for Bluetooth devices using bluest library
-    pub async fn scan_devices_realtime(&self, window: Window, duration_secs: u64) -> Result<()> {
-        self.scanner.scan_devices_realtime(window, duration_secs).await
+    pub async fn start_scan(&mut self, window: Window) -> Result<()> {
+        self.scanner.start_scan(window).await
+    }
+
+    pub async fn stop_scan(&mut self, window: Window) -> Result<()> {
+        self.scanner.stop_scan(window).await
     }
 
     /// Connects to a device with the given ID
