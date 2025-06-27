@@ -2,11 +2,12 @@
 //! This module provides the main interface for bluetooth operations
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 use anyhow::{anyhow, Result};
 use bluest::{Adapter, Device};
 use log::{info};
+use tokio::sync::Mutex;
 use tauri::{Window};
 
 use crate::core::bluetooth::commands::CommandExecutor;
@@ -77,7 +78,7 @@ impl BluetoothManager {
     /// Connects to a device with the given ID
     pub async fn connect_device(&mut self, window: Window, device_id: &str) -> Result<()> {
         let device = {
-            let devices = self.devices.lock().unwrap();
+            let devices = self.devices.lock().await;
             devices
                 .get(device_id)
                 .cloned()
@@ -86,6 +87,11 @@ impl BluetoothManager {
 
         if device.is_connected().await {
             self.disconnect(window.clone(), device_id).await?;
+        }
+
+        if device.is_paired().await? {
+            info!("Device is already paired, unpairing...");
+            device.unpair().await?;
         }
         
         // Connect to the device with retry mechanism
@@ -104,7 +110,7 @@ impl BluetoothManager {
             write_characteristic: write_char,
         };
         // If connection successful, store the connected device
-        *self.connected_state.lock().unwrap() = Some(state);
+        *self.connected_state.lock().await = Some(state);
 
         info!("Device successfully connected and state stored in the main service.");
         Ok(())
@@ -113,17 +119,17 @@ impl BluetoothManager {
     /// Disconnects from the currently connected device
     pub async fn disconnect(&mut self, window: Window, device_id: &str) -> Result<()> {
         let device = {
-            let devices = self.devices.lock().unwrap();
+            let devices = self.devices.lock().await;
             devices
                 .get(device_id)
                 .cloned()
                 .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
         };
 
-        self.notification_handler.abort_notifications().await?;
+        self.notification_handler.stop_notifications().await?;
         // drop ConnectedDeviceState
         {
-            let mut connected_state_guard = self.connected_state.lock().unwrap();
+            let mut connected_state_guard = self.connected_state.lock().await;
             *connected_state_guard = None;
             info!("Connected state cleared, releasing device and characteristic objects.");
         }
@@ -132,10 +138,18 @@ impl BluetoothManager {
         Ok(())
     }
 
+    /// Returns the ID of the currently connected device
+    pub async fn get_connected_device_id(&self) -> Option<String> {
+    let connected_state_guard = self.connected_state.lock().await;
+    connected_state_guard
+        .as_ref()
+        .map(|state| state.device.id().to_string())
+    }
+
     /// turn off the controller
     pub async fn turn_off_controller(&self) -> Result<()> {
         let connected_state = {
-            let connected = self.connected_state.lock().unwrap();
+            let connected = self.connected_state.lock().await;
             connected.clone().ok_or_else(|| anyhow!("No device connected"))?
         };
 
@@ -148,7 +162,7 @@ impl BluetoothManager {
     /// Calibrate the controller
     pub async fn calibrate_controller(&self) -> Result<()> {
         let connected_state = {
-            let connected = self.connected_state.lock().unwrap();
+            let connected = self.connected_state.lock().await;
             connected.clone().ok_or_else(|| anyhow!("No device connected"))?
         };
         

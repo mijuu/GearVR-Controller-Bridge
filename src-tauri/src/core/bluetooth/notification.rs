@@ -5,7 +5,8 @@ use anyhow::{Result};
 use bluest::{Characteristic};
 use futures_util::StreamExt;
 use log::{debug, error, info};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tauri::{Window, Emitter};
@@ -37,7 +38,7 @@ impl NotificationHandler {
         notify_char: Characteristic,
     ) -> Result<()> {
         if self.task_handle.is_some() {
-            self.abort_notifications().await?;
+            self.stop_notifications().await?;
         }
         self.cancel_token = Arc::new(CancellationToken::new());
 
@@ -47,9 +48,10 @@ impl NotificationHandler {
         let cancel_token = self.cancel_token.clone();
 
         // Start task to process notifications
-        tokio::spawn(async move {
-            Self::process_notifications(window, notify_char, controller_parser, cancel_token).await;
+        let handle = tokio::spawn(async move {
+            Self::process_notifications(window, notify_char, controller_parser, cancel_token).await
         });
+        self.task_handle = Some(handle);
 
         Ok(())
     }
@@ -60,55 +62,59 @@ impl NotificationHandler {
         notify_char: Characteristic,
         controller_parser: Arc<Mutex<ControllerParser>>,
         cancel_token: Arc<CancellationToken>,
-    ) {
+    ) -> Result<()> {
         info!("Listening for controller notifications...");
         
         match notify_char.notify().await {
             Ok(mut notification_stream) => {
                 loop {
                     tokio::select! {
-                        result = notification_stream.next() => {
-                            match result {
-                                Some(Ok(value)) => {
-                                    debug!("Received controller data: {:?}", value);
+                        stream_result = notification_stream.next() => {
+                            match stream_result {
+                                Some(inner_result) => {
+                                    match inner_result {
+                                        Ok(value) => {
+                                            debug!("Received controller data: {:?}", value);
 
-                                    // Parse the controller data
-                                    let controller_state = {
-                                        let mut parser = controller_parser.lock().unwrap();
-                                        parser.parse_data(&value)
-                                    };
+                                            // Parse the controller data
+                                            let controller_state = {
+                                                let mut parser = controller_parser.lock().await;
+                                                parser.parse_data(&value)
+                                            };
 
-                                    match controller_state {
-                                        Some(state) => {
-                                            debug!("Parsed controller state: {:?}", state);
+                                            match controller_state {
+                                                Some(state) => {
+                                                    debug!("Parsed controller state: {:?}", state);
 
-                                            // Send parsed controller state to frontend
-                                            if let Err(e) = window.emit(
-                                                "controller-state",
-                                                serde_json::json!(state),
-                                            ) {
-                                                error!("Failed to emit controller state: {}", e);
+                                                    // Send parsed controller state to frontend
+                                                    if let Err(e) = window.emit(
+                                                        "controller-state",
+                                                        serde_json::json!(state),
+                                                    ) {
+                                                        error!("Failed to emit controller state: {}", e);
+                                                    }
+                                                }
+                                                None => {
+                                                    error!("Failed to parse controller data: no valid state");
+
+                                                    // Send raw data to frontend (for debugging)
+                                                    if let Err(e) = window.emit(
+                                                        "controller-data",
+                                                        serde_json::json!({
+                                                            "uuid": notify_char.uuid().to_string(),
+                                                            "data": value,
+                                                        }),
+                                                    ) {
+                                                        error!("Failed to emit controller data: {}", e);
+                                                    }
+                                                }
                                             }
                                         }
-                                        None => {
-                                            error!("Failed to parse controller data: no valid state");
-
-                                            // Send raw data to frontend (for debugging)
-                                            if let Err(e) = window.emit(
-                                                "controller-data",
-                                                serde_json::json!({
-                                                    "uuid": notify_char.uuid().to_string(),
-                                                    "data": value,
-                                                }),
-                                            ) {
-                                                error!("Failed to emit controller data: {}", e);
-                                            }
+                                        Err(e) => {
+                                            error!("Error in notification stream: {}", e);
+                                            return Err(anyhow::Error::new(e));
                                         }
                                     }
-                                }
-                                Some(Err(e)) => {
-                                    error!("Error in notification stream: {}", e);
-                                    break;
                                 }
                                 None => {
                                     info!("Notification stream ended gracefully (no more items).");
@@ -125,14 +131,16 @@ impl NotificationHandler {
             }
             Err(e) => {
                 error!("Failed to subscribe to notifications: {}", e);
+                return Err(anyhow::Error::new(e));
             }
         }
 
         info!("Notification stream ended");
+        Ok(())
     }
 
-    pub async  fn abort_notifications(&mut self) -> Result<()> {
-        info!("Aborting notification: Cancel signal sent.");
+    pub async  fn stop_notifications(&mut self) -> Result<()> {
+        info!("Stoping last notification.");
         self.cancel_token.cancel();
 
         // 等待任务结束

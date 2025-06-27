@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import ControllerStatus from './ControllerStatus/ControllerStatus';
+import ControllerStatus, { ControllerState } from './ControllerStatus/ControllerStatus';
 
 interface BluetoothDevice {
   name: string;
@@ -24,30 +24,8 @@ const MainView: React.FC = () => {
     exit: { y: -20, opacity: 0 }
   };
 
-  // Show controller view when connected
-  useEffect(() => {
-    if (status !== 'connected') 
-      return;
-
-    const timer = setTimeout(() => {
-      setShowController(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [status]);
-
   // Start device search on mount
   useEffect(() => {    
-    const searchDevices = async () => {
-      try {
-        setStatus('searching');        
-        await invoke('start_scan');
-      } catch (err) {
-        console.error('scan', err);
-        setError(`搜索失败: ${err}`);
-      }
-    };
-
     // Listen for device found event
     const deviceFoundUnlisten = listen<BluetoothDevice>('device-found', (event) => {
       // Skip if already found or same device
@@ -74,6 +52,15 @@ const MainView: React.FC = () => {
       }, 1500);
     });
 
+    const payloadUnlisten = listen<ControllerState>("controller-state", (event) => {   
+      if (event.payload) {
+        setStatus('connected');
+        setTimeout(() => {
+          setShowController(true);
+        }, 1500);
+      }
+    });
+
     searchDevices();
 
     return () => {
@@ -82,9 +69,21 @@ const MainView: React.FC = () => {
 
       deviceFoundUnlisten.then(f => f());
       connectUnlisten.then(f => f());
+      payloadUnlisten.then(f => f());
     };
   }, []);
-
+  
+  const searchDevices = async () => {
+    try {
+      setStatus('searching');        
+      setError(null);
+      await invoke('start_scan');
+    } catch (err) {
+      console.error('scan', err);
+      setError(`搜索失败: ${err}`);
+    }
+  };
+  
   const connectToDevice = async (deviceId: string) => {
     try {
       setStatus('connecting');
@@ -97,6 +96,8 @@ const MainView: React.FC = () => {
       
       if (errorMessage.includes('Peer removed pairing information')) {
         setError('检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接');
+      } else if (errorMessage.includes('the Bluetooth device isn\'t connected: unreachable')) {
+        setError('检查到设备已被重置，请在系统设置中选择删除此设备后，重新尝试连接')
       } else {
         setError(`连接失败: ${errorMessage}`);
       }
@@ -238,7 +239,9 @@ const MainView: React.FC = () => {
             style={{ zIndex: 1, textAlign: 'center' }}
           >
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接失败!</h1>
-            <p>点击重新搜索</p>
+            <div className="rescan-button" onClick={ searchDevices }>
+              <span>重新搜索</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -260,6 +263,22 @@ const MainView: React.FC = () => {
           {error}
         </motion.div>
       )}
+      <style>{`
+        .rescan-button {
+            background-color: #333;
+            color: #00ffcc;
+            padding: 0.6rem;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            transition: .5s;
+        }
+        .rescan-button:hover {
+            background-color: #00ffcc;
+            color: #333;
+        }
+      `}</style>
     </div>
   );
 };

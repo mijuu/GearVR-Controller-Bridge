@@ -1,12 +1,13 @@
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 use regex::Regex;
 use anyhow::{Result};
 use futures_util::StreamExt;
 use bluest::{Adapter, Device};
 use log::{info, debug, error};
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tauri::{Window, Emitter};
@@ -21,7 +22,7 @@ pub struct BluetoothScanner {
     adapter: Adapter,
     devices: Arc<Mutex<HashMap<String, Device>>>,
     cancel_token: Arc<CancellationToken>,
-    task_handle: Option<JoinHandle<Result<()>>>,
+    task_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
 }
 impl BluetoothScanner {
     pub fn new(adapter: Adapter, devices: Arc<Mutex<HashMap<String, Device>>>) -> Self {
@@ -29,15 +30,19 @@ impl BluetoothScanner {
             adapter,
             devices,
             cancel_token: Arc::new(CancellationToken::new()),
-            task_handle: None,
+            task_handle: Arc::new(Mutex::new(None)),
         }
     }
     pub async fn start_scan(&mut self, window: Window) -> Result<()> {
-        // Clear existing devices
-        self.devices.lock().unwrap().clear();
-        if self.task_handle.is_some() {
-            self.stop_scan(window.clone()).await?;
+        // 获取 task_handle 的锁，检查是否有正在进行的任务
+        let mut current_task_handle = self.task_handle.lock().await;
+        if current_task_handle.is_some() {
+            info!("Scan task is already running. Skipping new scan.");
+            return Ok(());
         }
+
+        // Clear existing devices
+        self.devices.lock().await.clear();
 
         self.cancel_token = Arc::new(CancellationToken::new());
         let cancel_token_for_task = self.cancel_token.clone();
@@ -46,6 +51,7 @@ impl BluetoothScanner {
         let devices_for_task = self.devices.clone();
         let window_for_task = window.clone();
         let min_rssi_threshold = MIN_RSSI_THRESHOLD;
+        let task_handle_clone = self.task_handle.clone();
 
         let handle = tokio::spawn(async move {
             let _ = Self::internal_scan_task(
@@ -55,10 +61,16 @@ impl BluetoothScanner {
                 cancel_token_for_task,
                 min_rssi_threshold,
             ).await;
+            // Reset task handle on scan completion
+            {
+                let mut handle_guard = task_handle_clone.lock().await;
+                *handle_guard = None;
+            }
             Ok(())
         });
 
-        self.task_handle = Some(handle);
+        *current_task_handle = Some(handle);
+        drop(current_task_handle); // 提前释放锁，避免死锁或长时间持有
 
         // Emit scan-start event
         if let Err(e) = window.emit("scan-start", ()) {
@@ -138,11 +150,17 @@ impl BluetoothScanner {
     }
 
     pub async fn stop_scan(&mut self, window: Window, ) -> Result<()> {
-        info!("Stopping Bluetooth scan.");
+        info!("Stopping last Bluetooth scan.");
         self.cancel_token.cancel();
 
+        // 获取 task_handle 的锁，并取出 JoinHandle
+        let handle_to_await = {
+            let mut current_task_handle = self.task_handle.lock().await;
+            current_task_handle.take() // 使用 take() 避免持有锁等待
+        };
+
         // 等待任务结束
-        if let Some(handle) = self.task_handle.take() {
+        if let Some(handle) = handle_to_await {
             info!("Waiting for scan task to finish...");
             // handle.await 会等待任务完成或被取消，并返回 JoinError 或任务的 Result
             
@@ -195,7 +213,7 @@ impl BluetoothScanner {
         );
 
         {
-            let mut devices: std::sync::MutexGuard<'_, HashMap<String, Device>> = devices.lock().unwrap();
+            let mut devices = devices.lock().await;
             devices.insert(id.clone(), device.clone());
         }
 
