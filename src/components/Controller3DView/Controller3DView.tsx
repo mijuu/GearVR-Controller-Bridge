@@ -1,5 +1,5 @@
 import { useFrame, useLoader } from "@react-three/fiber";
-import { OrbitControls, useTexture, Html } from "@react-three/drei";
+import { OrbitControls, useTexture } from "@react-three/drei";
 import { Euler, Quaternion, Mesh, MeshStandardMaterial } from "three";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { Suspense, useMemo, useRef } from "react";
@@ -72,7 +72,7 @@ export default function Controller3DView({ state }: Controller3DViewProps) {
         minDistance={1}
         maxDistance={5}
       />
-      <Suspense fallback={<Html center>加载模型中...</Html>}>
+      <Suspense>
         <Model state={state} />
       </Suspense>
     </>

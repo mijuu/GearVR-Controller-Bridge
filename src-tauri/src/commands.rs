@@ -57,6 +57,19 @@ pub async fn connect_to_device(
     bluetooth_manager_guard.connect_device(window, &device_id).await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn get_battery_level(
+    app_state: State<'_, AppState>,
+) -> Result<u8, String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    
+    bluetooth_manager_guard.get_battery_level()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No battery level available".to_string())
+}
+
 /// Disconnects from the currently connected device
 ///
 /// # Arguments

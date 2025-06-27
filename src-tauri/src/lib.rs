@@ -8,7 +8,7 @@ pub mod state;
 pub mod logging;
 
 // Import our modules
-use commands::{connect_to_device, disconnect, start_scan, stop_scan, turn_off_controller};
+use commands::{connect_to_device, disconnect, start_scan, stop_scan, get_battery_level, turn_off_controller};
 use state::AppState;
 use log::{info};
 use tauri::Manager;
@@ -21,8 +21,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         // Register our commands
         .invoke_handler(tauri::generate_handler![
-            start_scan, stop_scan,
+            start_scan,
+            stop_scan,
             connect_to_device,
+            get_battery_level,
             disconnect,
             turn_off_controller,
         ])

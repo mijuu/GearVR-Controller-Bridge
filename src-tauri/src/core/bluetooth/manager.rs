@@ -149,8 +149,8 @@ impl BluetoothManager {
     /// turn off the controller
     pub async fn turn_off_controller(&self) -> Result<()> {
         let connected_state = {
-            let connected = self.connected_state.lock().await;
-            connected.clone().ok_or_else(|| anyhow!("No device connected"))?
+            let connected_state_guard = self.connected_state.lock().await;
+            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
         };
 
         let command_sender = BluestCommandSender::new(connected_state.write_characteristic.clone());
@@ -162,8 +162,8 @@ impl BluetoothManager {
     /// Calibrate the controller
     pub async fn calibrate_controller(&self) -> Result<()> {
         let connected_state = {
-            let connected = self.connected_state.lock().await;
-            connected.clone().ok_or_else(|| anyhow!("No device connected"))?
+            let connected_state_guard = self.connected_state.lock().await;
+            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
         };
         
         // Find write characteristic
@@ -189,7 +189,13 @@ impl BluetoothManager {
     }
 
     /// Get battery level
-    pub async fn get_battery_level(&self, device: &Device) -> Result<Option<u8>> {
+    pub async fn get_battery_level(&self) -> Result<Option<u8>> {
+        let connected_state = {
+            let connected_state_guard = self.connected_state.lock().await;
+            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
+        };
+
+        let device = connected_state.device.clone();
         if !device.is_connected().await {
             info!("Device {:?} is not connected. Skipping battery level retrieval.", device.id());
             return Ok(None); // Return None if not connected

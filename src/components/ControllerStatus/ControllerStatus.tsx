@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from "@react-three/fiber";
 import Controller3DView from "../Controller3DView/Controller3DView";
 import "./ControllerStatus.css";
@@ -37,14 +38,30 @@ export default function ControllerStatus() {
                 (event) => {
                     setBatteryLevel(event.payload);
                 }
-                );
+            );
             return unlisten;
         };
-
         const unlistenPromise = setupListener();
+
+        const updateBatteryLevel = async () => {
+            try {
+                const batteryLevel = await invoke('get_battery_level') as number;
+                setBatteryLevel(batteryLevel);
+            } catch (error) {
+                console.error('Failed to get battery level:', error);
+            }
+        };
+        // 立即获取一次电池电量
+        updateBatteryLevel();
+
+        // 定时获取电池电量
+        const intervalId = setInterval(async () => {
+            await updateBatteryLevel();
+        }, 30000);
 
         return () => {
             unlistenPromise.then((unlisten) => unlisten());
+            clearInterval(intervalId);
         };
     }, []);
 
@@ -67,7 +84,7 @@ export default function ControllerStatus() {
     }, []);
 
     if (!state) {
-        return <div className="controller-status">等待控制器数据...</div>;
+        return null;
     }
 
     return (
