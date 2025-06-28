@@ -3,6 +3,7 @@
 
 // Module declarations
 pub mod core;
+pub mod mapping;
 pub mod commands;
 pub mod state;
 pub mod logging;

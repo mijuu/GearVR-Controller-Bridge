@@ -53,8 +53,10 @@ pub async fn connect_to_device(
 ) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    let mouse_sender = app_state.mouse_sender.clone(); 
     
-    bluetooth_manager_guard.connect_device(window, &device_id).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.connect_device(window, &device_id, mouse_sender).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

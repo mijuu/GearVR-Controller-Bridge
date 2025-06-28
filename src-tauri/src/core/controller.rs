@@ -36,7 +36,7 @@ pub struct ControllerState {
 }
 
 /// Represents the state of the controller buttons
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ButtonState {
     pub trigger: bool,
     pub home: bool,

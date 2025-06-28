@@ -10,6 +10,7 @@ use log::{info};
 use tokio::sync::Mutex;
 use tauri::{Window};
 
+use crate::mapping::mouse::MouseMapperSender;
 use crate::core::bluetooth::commands::CommandExecutor;
 use crate::core::bluetooth::connection::{ConnectionManager, BluestCommandSender};
 use crate::core::bluetooth::types::{ConnectedDeviceState};
@@ -76,7 +77,7 @@ impl BluetoothManager {
     }
 
     /// Connects to a device with the given ID
-    pub async fn connect_device(&mut self, window: Window, device_id: &str) -> Result<()> {
+    pub async fn connect_device(&mut self, window: Window, device_id: &str, mouse_sender: MouseMapperSender,) -> Result<()> {
         let device = {
             let devices = self.devices.lock().await;
             devices
@@ -101,6 +102,7 @@ impl BluetoothManager {
             &device,
             &window,
             &mut self.notification_handler,
+            mouse_sender,
             UUID_CONTROLLER_SERVICE,
             UUID_CONTROLLER_NOTIFY_CHAR,
             UUID_CONTROLLER_WRITE_CHAR,

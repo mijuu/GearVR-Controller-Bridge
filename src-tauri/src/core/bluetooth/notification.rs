@@ -12,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 use tauri::{Window, Emitter};
 
 use crate::core::controller::ControllerParser;
+use crate::mapping::mouse::MouseMapperSender;
 
 /// Notification handler for controller data
 pub struct NotificationHandler {
@@ -23,7 +24,9 @@ pub struct NotificationHandler {
 
 impl NotificationHandler {
     /// Create a new NotificationHandler
-    pub fn new(controller_parser: Arc<Mutex<ControllerParser>>) -> Self {
+    pub fn new(
+        controller_parser: Arc<Mutex<ControllerParser>>,
+    ) -> Self {
         Self {
             controller_parser,
             cancel_token: Arc::new(CancellationToken::new()),
@@ -36,6 +39,7 @@ impl NotificationHandler {
         &mut self,
         window: Window,
         notify_char: Characteristic,
+        mouse_sender: MouseMapperSender,
     ) -> Result<()> {
         if self.task_handle.is_some() {
             self.stop_notifications().await?;
@@ -49,7 +53,13 @@ impl NotificationHandler {
 
         // Start task to process notifications
         let handle = tokio::spawn(async move {
-            Self::process_notifications(window, notify_char, controller_parser, cancel_token).await
+            Self::process_notifications(
+                window,
+                notify_char,
+                controller_parser,
+                mouse_sender,
+                cancel_token
+            ).await
         });
         self.task_handle = Some(handle);
 
@@ -61,6 +71,7 @@ impl NotificationHandler {
         window: Window,
         notify_char: Characteristic,
         controller_parser: Arc<Mutex<ControllerParser>>,
+        mouse_sender: MouseMapperSender,
         cancel_token: Arc<CancellationToken>,
     ) -> Result<()> {
         info!("Listening for controller notifications...");
@@ -85,6 +96,10 @@ impl NotificationHandler {
                                             match controller_state {
                                                 Some(state) => {
                                                     debug!("Parsed controller state: {:?}", state);
+
+                                                    if let Err(e) = mouse_sender.update(state.clone()).await {
+                                                        error!("Failed to send update command via MouseMapperSender: {}", e);
+                                                    }
 
                                                     // Send parsed controller state to frontend
                                                     if let Err(e) = window.emit(

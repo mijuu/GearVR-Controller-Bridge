@@ -6,11 +6,13 @@ use tokio::sync::Mutex;
 use anyhow::{Result};
 use log::{info};
 use crate::core::BluetoothManager;
+use crate::mapping::mouse::MouseMapperSender; 
 
 /// Global application state
 pub struct AppState {
     /// The Bluetooth manager instance
     pub bluetooth_manager: Arc<Mutex<BluetoothManager>>,
+    pub mouse_sender: MouseMapperSender,
 }
 
 impl AppState {
@@ -20,6 +22,7 @@ impl AppState {
         let manager = BluetoothManager::new().await?;
         Ok(Self {
             bluetooth_manager: Arc::new(Mutex::new(manager)),
+            mouse_sender: MouseMapperSender::new(),
         })
     }
 

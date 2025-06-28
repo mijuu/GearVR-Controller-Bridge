@@ -7,6 +7,7 @@ use log::{info, warn, error};
 use std::time::Duration;
 use tauri::{Window, Emitter};
 
+use crate::mapping::mouse::MouseMapperSender;
 use crate::core::bluetooth::notification::NotificationHandler;
 use crate::core::bluetooth::{commands::{CommandExecutor, CommandSender, ControllerCommand}};
 
@@ -29,6 +30,7 @@ impl ConnectionManager {
         device: &Device,
         window: &Window,
         notification_handler: &mut NotificationHandler,
+        mouse_sender: MouseMapperSender,
         controller_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
@@ -41,6 +43,7 @@ impl ConnectionManager {
                 device,
                 window,
                 notification_handler,
+                mouse_sender.clone(),
                 controller_service_uuid,
                 notify_char_uuid,
                 write_char_uuid,
@@ -71,6 +74,7 @@ impl ConnectionManager {
         device: &Device,
         window: &Window,
         notification_handler: &mut NotificationHandler,
+        mouse_sender: MouseMapperSender,
         controller_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
@@ -131,6 +135,7 @@ impl ConnectionManager {
         notification_handler.setup_notifications(
             window.clone(),
             notify_char_for_task,
+            mouse_sender,
         ).await?;
 
         info!("Initializing controller in sensor mode...");
