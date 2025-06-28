@@ -89,9 +89,11 @@ impl BluetoothManager {
             self.disconnect(window.clone(), device_id).await?;
         }
 
-        if device.is_paired().await? {
-            info!("Device is already paired, unpairing...");
-            device.unpair().await?;
+        if cfg!(target_os = "windows") {
+            if device.is_paired().await? {
+                info!("Device is already paired, unpairing...");
+                device.unpair().await?;
+            }
         }
         
         // Connect to the device with retry mechanism
