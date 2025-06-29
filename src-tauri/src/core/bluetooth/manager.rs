@@ -6,9 +6,9 @@ use std::sync::{Arc};
 
 use anyhow::{anyhow, Result};
 use bluest::{Adapter, Device};
-use log::{info};
+use log::{info, error};
 use tokio::sync::Mutex;
-use tauri::{Window};
+use tauri::{Emitter, Window};
 
 use crate::mapping::mouse::MouseMapperSender;
 use crate::core::bluetooth::commands::CommandExecutor;
@@ -193,7 +193,7 @@ impl BluetoothManager {
     }
 
     /// Get battery level
-    pub async fn get_battery_level(&self) -> Result<Option<u8>> {
+    pub async fn get_battery_level(&self, window: Window) -> Result<Option<u8>> {
         let connected_state = {
             let connected_state_guard = self.connected_state.lock().await;
             connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
@@ -202,6 +202,10 @@ impl BluetoothManager {
         let device = connected_state.device.clone();
         if !device.is_connected().await {
             info!("Device {:?} is not connected. Skipping battery level retrieval.", device.id());
+            
+            if let Err(e) = window.emit("device-lost-connection", ()) {
+                error!("Failed to emit device-lost-connection event: {}", e);
+            }
             return Ok(None); // Return None if not connected
         }
 

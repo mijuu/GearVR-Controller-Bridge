@@ -57,7 +57,7 @@ export default function ControllerStatus() {
         // 定时获取电池电量
         const intervalId = setInterval(async () => {
             await updateBatteryLevel();
-        }, 30000);
+        }, 5000);
 
         return () => {
             unlistenPromise.then((unlisten) => unlisten());

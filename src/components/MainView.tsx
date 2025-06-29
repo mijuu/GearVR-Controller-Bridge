@@ -61,6 +61,14 @@ const MainView: React.FC = () => {
       }
     });
 
+    const lostUnlisten = listen<{id: string}>('device-lost-connection', () => {
+      setStatus('failed');
+      setDevice(null);
+      setError('设备已断开连接');
+    });
+
+    // Stop scanning when component unmounts
+
     searchDevices();
 
     return () => {
@@ -70,6 +78,7 @@ const MainView: React.FC = () => {
       deviceFoundUnlisten.then(f => f());
       connectUnlisten.then(f => f());
       payloadUnlisten.then(f => f());
+      lostUnlisten.then(f => f());
     };
   }, []);
   
