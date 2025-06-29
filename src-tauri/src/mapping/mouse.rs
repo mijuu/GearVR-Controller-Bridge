@@ -1,5 +1,5 @@
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use anyhow::Result;
 use tokio::sync::mpsc;
 use log::{info};
@@ -20,31 +20,36 @@ impl MouseMapperSender {
     pub fn new() -> Self {
         let (tx, mut rx) = mpsc::channel(32);
 
-        thread::spawn(move || {
-            let mut mouse_mapper = MouseMapper::new();
-            info!("MouseMapper thread with interpolation started.");
+                    thread::spawn(move || {
+                        let mut mouse_mapper = MouseMapper::new();
+                        info!("MouseMapper thread with interpolation started.");
 
-            // 定义我们的平滑循环频率，例如 250Hz
-            const INTERPOLATION_HZ: u64 = 250;
-            let tick_duration = Duration::from_millis(1000 / INTERPOLATION_HZ);
+                        // 定义我们的平滑循环频率，例如 250Hz
+                        const INTERPOLATION_HZ: u64 = 250;
+                        let tick_duration = Duration::from_millis(1000 / INTERPOLATION_HZ);
+                        let mut last_update_time = Instant::now();
 
-            loop {
-                // 1. 非阻塞地检查是否有新的控制器数据
-                if let Ok(command) = rx.try_recv() {
-                    match command {
-                        MouseMapperCommand::Update(state) => {
-                            // 如果有新数据，就调用 update 来更新【目标位置】
-                            mouse_mapper.update(&state);
+                        loop {
+                            // 1. 非阻塞地检查是否有新的控制器数据
+                            if let Ok(command) = rx.try_recv() {
+                                match command {
+                                    MouseMapperCommand::Update(state) => {
+                                        // 如果有新数据，就调用 update 来更新【目标位置】
+                                        mouse_mapper.update(&state);
+                                        last_update_time = Instant::now();
+                                    }
+                                }
+                            }
+
+                            // 2. 检查是否超过5秒没有数据更新
+                            if last_update_time.elapsed() < Duration::from_secs(5) {
+                                // 只有最近5秒内有更新时才执行插值计算
+                                mouse_mapper.interpolate_tick();
+                            }
+
+                            // 3. 等待一小段时间，以维持固定的循环频率
+                            thread::sleep(tick_duration);
                         }
-                    }
-                }
-
-                // 2. 无论有没有新数据，每一帧都执行平滑插值计算和移动
-                mouse_mapper.interpolate_tick();
-
-                // 3. 等待一小段时间，以维持固定的循环频率
-                thread::sleep(tick_duration);
-            }
         });
 
         Self { tx }

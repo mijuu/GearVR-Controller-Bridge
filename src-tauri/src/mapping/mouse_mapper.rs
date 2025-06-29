@@ -2,6 +2,7 @@
 //! This module maps controller inputs to mouse and keyboard actions using the enigo library.
 
 use enigo::{Enigo, KeyboardControllable, MouseButton, MouseControllable};
+use log::info;
 use nalgebra::UnitQuaternion;
 use serde::{Deserialize, Serialize};
 
@@ -38,10 +39,10 @@ impl Default for ButtonMapping {
 }
 
 /// Mouse movement mode
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum MouseMode {
-    /// Use controller orientation to control mouse movement
-    Orientation,
+    /// Use controller air mouse to control mouse movement
+    AirMouse,
     /// Use touchpad to control mouse movement (like laptop touchpad)
     Touchpad,
 }
@@ -53,8 +54,8 @@ pub struct MouseMapperConfig {
     pub mode: MouseMode,
     /// Button mappings
     pub button_mapping: ButtonMapping,
-    /// Mouse sensitivity for orientation mode
-    pub orientation_sensitivity: f32,
+    /// Mouse sensitivity for air mouse mode
+    pub air_mouse_sensitivity: f32,
     /// Mouse sensitivity for touchpad mode
     pub touchpad_sensitivity: f32,
     /// Acceleration factor for touchpad mode. 0.0 means no acceleration.
@@ -62,17 +63,23 @@ pub struct MouseMapperConfig {
     /// The speed threshold to activate acceleration. Below this, movement is linear (precise).
     /// The unit is abstract, related to (distance_squared / time_delta).
     pub touchpad_acceleration_threshold: f32,
+    /// The horizontal field of view (in degrees) that maps to the full screen width.
+    pub air_mouse_fov: f32,
+    /// Rotational speed threshold (e.g., in degrees per second) to activate air mouse mode.
+    pub air_mouse_activation_threshold: f32,
 }
 
 impl Default for MouseMapperConfig {
     fn default() -> Self {
         MouseMapperConfig {
-            mode: MouseMode::Touchpad,
+            mode: MouseMode::AirMouse,
             button_mapping: ButtonMapping::default(),
-            orientation_sensitivity: 10.0,
+            air_mouse_sensitivity: 10.0,
             touchpad_sensitivity: 500.0,
             touchpad_acceleration: 1.2,
             touchpad_acceleration_threshold: 0.0002,
+            air_mouse_fov: 40.0,
+            air_mouse_activation_threshold: 5.0,
         }
     }
 }
@@ -93,6 +100,8 @@ pub struct MouseMapper {
     target_screen_y: i32,
     /// A flag to indicate if the touchpad is currently being used.
     is_touchpad_active: bool,
+    /// A flag to indicate if the air mouse is currently being used.
+    is_air_mouse_active: bool,
 }
 
 impl MouseMapper {
@@ -109,6 +118,7 @@ impl MouseMapper {
             target_screen_x: x,
             target_screen_y: y,
             is_touchpad_active: false,
+            is_air_mouse_active: false,
         }
     }
 
@@ -125,39 +135,62 @@ impl MouseMapper {
             target_screen_x: x,
             target_screen_y: y,
             is_touchpad_active: false,
+            is_air_mouse_active: false,
         }
     }
 
     /// Updates the mouse mapper with new controller state
     pub fn update(&mut self, state: &ControllerState) {
-        // 步骤 1: 检查 `last_state` 是否存在。如果存在，克隆出所需的数据。
+        // 提取上一次的状态数据
         let last_state_data = self
             .last_state
             .as_ref()
             .map(|last| (last.buttons.clone(), last.touchpad.clone(), last.timestamp));
 
-        // 步骤 2: 现在 `self` 没有被任何借用持有，我们可以自由地调用可变方法了。
         if let Some((last_buttons, last_touchpad, last_timestamp)) = last_state_data {
-            // --- 按钮处理 ---
+            // --- 步骤 1: 按钮处理（所有模式通用） ---
             self.handle_buttons(&state.buttons, &last_buttons);
 
-            // --- 移动处理 ---
+            // --- 步骤 2: 使用 match 彻底分离不同模式的移动逻辑 ---
             match self.config.mode {
-                MouseMode::Orientation => {
-                    self.handle_orientation_movement(&state.orientation);
+                MouseMode::AirMouse => {
+                    let delta_t_ms = state.timestamp - last_timestamp;
+                    if delta_t_ms > 0 {
+                        let delta_t_s = delta_t_ms as f32 / 1000.0;
+
+                        let last_orientation = self.last_state.as_ref().unwrap().orientation;
+                        let delta_orientation = last_orientation.inverse() * state.orientation;
+                        let rotation_angle_deg = delta_orientation.angle().to_degrees() as f32;
+                        let rotational_speed_dps = rotation_angle_deg / delta_t_s;
+
+                        // 更新激活状态
+                        self.is_air_mouse_active =
+                            rotational_speed_dps > self.config.air_mouse_activation_threshold;
+                    }
+
+                    // 只有在激活时才计算目标点
+                    if self.is_air_mouse_active {
+                        self.handle_air_mouse_movement(&state.orientation);
+                    }
+
+                    // 确保在 AirMouse 模式下，touchpad 状态被重置
+                    self.is_touchpad_active = false;
                 }
                 MouseMode::Touchpad => {
                     let delta_t = (state.timestamp - last_timestamp) as f32;
                     self.handle_touchpad_movement(&state.touchpad, &last_touchpad, delta_t);
+
+                    // 确保在 Touchpad 模式下，air_mouse 状态被重置
+                    self.is_air_mouse_active = false;
                 }
             }
         } else {
-            // 只处理按钮的初次按下，没有弹起。
+            // 处理第一帧的按钮按下
             let default_buttons = ButtonState::default();
             self.handle_buttons(&state.buttons, &default_buttons);
         }
 
-        // 步骤 3: 在所有操作的最后，更新 `last_state` 以供下一帧使用。
+        // --- 步骤 3: 更新 last_state (所有模式通用) ---
         self.last_state = Some(state.clone());
     }
 
@@ -244,20 +277,31 @@ impl MouseMapper {
         }
     }
 
-    /// Handles mouse movement in orientation mode
-    fn handle_orientation_movement(&mut self, orientation: &UnitQuaternion<f64>) {
-        // Get current mouse position
-        let (x, y) = self.enigo.mouse_location();
+    /// Handles mouse movement in air mouse mode using absolute position mapping.
+    fn handle_air_mouse_movement(&mut self, orientation: &UnitQuaternion<f64>) {
+        // --- 步骤 1: 将原始四元数变换到显示坐标系 ---
+        let transformed_quat =
+            nalgebra::Quaternion::new(orientation.w, orientation.j, orientation.i, -orientation.k);
+        let transformed_orientation = UnitQuaternion::new_normalize(transformed_quat);
+        // --- 步骤 2: 从【变换后】的四元数中提取欧拉角 (此部分逻辑不变) ---
+        let (_roll, pitch, yaw) = transformed_orientation.euler_angles();
+        let horizontal_deg = yaw.to_degrees() as f32;
+        let vertical_deg = pitch.to_degrees() as f32;
 
-        // Convert quaternion to pitch and yaw angles
-        let (pitch, yaw, _) = orientation.euler_angles();
+        // --- 步骤 3: 将正确的角度映射到屏幕坐标 (此部分逻辑不变) ---
+        let (screen_width, screen_height) = self.enigo.main_display_size();
 
-        // Calculate mouse movement based on orientation
-        let dx = (yaw.to_degrees() * self.config.orientation_sensitivity as f64) as i32;
-        let dy = (pitch.to_degrees() * self.config.orientation_sensitivity as f64) as i32;
+        // 【方向微调】根据需要对角度取反
+        let x_ratio = (horizontal_deg / self.config.air_mouse_fov) + 0.5;
+        let aspect_ratio = screen_height as f32 / screen_width as f32;
+        let vertical_fov = self.config.air_mouse_fov * aspect_ratio;
+        let y_ratio = (-vertical_deg / vertical_fov) + 0.5;
 
-        // Move mouse relative to current position
-        self.enigo.mouse_move_relative(dx, -dy); // Invert y-axis for natural movement
+        let target_x = (x_ratio * screen_width as f32).round() as i32;
+        let target_y = (y_ratio * screen_height as f32).round() as i32;
+
+        self.target_screen_x = target_x.clamp(0, screen_width as i32 - 1);
+        self.target_screen_y = target_y.clamp(0, screen_height as i32 - 1);
     }
 
     /// Handles mouse movement in touchpad mode with relative tracking and acceleration.
@@ -323,7 +367,7 @@ impl MouseMapper {
     /// This should be called at a high, fixed frequency.
     pub fn interpolate_tick(&mut self) {
         // 检查触摸板是否处于非活跃状态
-        if !self.is_touchpad_active {
+        if !self.is_touchpad_active && !self.is_air_mouse_active {
             // 1. 获取鼠标当前在操作系统中的真实位置
             let (current_x, current_y) = self.enigo.mouse_location();
             self.target_screen_x = current_x;
