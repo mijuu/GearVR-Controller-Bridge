@@ -4,12 +4,14 @@
 // Module declarations
 pub mod core;
 pub mod mapping;
-pub mod commands;
 pub mod state;
+pub mod config;
+pub mod commands;
 pub mod logging;
+pub mod utils;
 
 // Import our modules
-use commands::{connect_to_device, disconnect, start_scan, stop_scan, get_battery_level, turn_off_controller};
+use commands::{connect_to_device, disconnect, start_scan, stop_scan, get_battery_level, turn_off_controller, start_calibration_wizard};
 use state::AppState;
 use log::{info};
 use tauri::Manager;
@@ -28,13 +30,14 @@ pub fn run() {
             get_battery_level,
             disconnect,
             turn_off_controller,
+            start_calibration_wizard,
         ])
         // Setup our application state
         .setup(move |app| {
             // Create and manage our application state
             let app_state_instance = rt.block_on(async {
                 info!("Starting AppState initialization in Tauri setup.");
-                AppState::new().await.expect("Failed to initialize AppState with BluetoothManager")
+                AppState::new(app.handle()).await.expect("Failed to initialize AppState with BluetoothManager")
             });
 
             app.manage(app_state_instance);

@@ -92,3 +92,15 @@ pub async fn turn_off_controller(app_state: State<'_, AppState>) -> Result<(), S
     
     bluetooth_manager_guard.turn_off_controller().await.map_err(|e| e.to_string())
 }
+
+/// Starts the calibration wizard.
+#[tauri::command]
+pub async fn start_calibration_wizard(
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    bluetooth_manager_guard.start_calibration_wizard(window).await.map_err(|e| e.to_string())
+}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import ControllerStatus, { ControllerState } from './ControllerStatus/ControllerStatus';
+import { ControllerState } from './ControllerView/ControllerView';
 
 interface BluetoothDevice {
   name: string;
@@ -11,11 +11,14 @@ interface BluetoothDevice {
   is_connected: boolean;
 }
 
-const MainView: React.FC = () => {
+interface MainViewProps {
+  onControllerConnected: () => void;
+}
+
+const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
   const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected' | 'failed'>('searching');
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showController, setShowController] = useState(false);
 
   // Text animation variants
   const textVariants = {
@@ -56,7 +59,7 @@ const MainView: React.FC = () => {
       if (event.payload) {
         setStatus('connected');
         setTimeout(() => {
-          setShowController(true);
+          onControllerConnected(); // Call the callback
         }, 1500);
       }
     });
@@ -113,10 +116,6 @@ const MainView: React.FC = () => {
       setStatus('failed');
     }
   };
-
-  if (showController && device) {
-    return <ControllerStatus />;
-  }
 
   return (
     <div className="main-view" style={{

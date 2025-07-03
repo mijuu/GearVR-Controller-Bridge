@@ -2,7 +2,7 @@
 //! This module contains all the commands that can be sent to the controller
 
 use anyhow::Result;
-use log::{debug, info};
+use log::{debug, info, error};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -72,6 +72,11 @@ impl<T: CommandSender> CommandExecutor<T> {
 
     /// Initialize the controller with sensor mode or VR mode
     pub async fn initialize_controller(&self, vr_mode: bool) -> Result<()> {
+        // disable LPM mode for smooth operation
+        info!("Disabling LPM mode");
+        self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
+        sleep(Duration::from_millis(100)).await;
+
         // Send the appropriate mode command
         let command = if vr_mode {
             info!("Setting VR Mode");
@@ -81,8 +86,6 @@ impl<T: CommandSender> CommandExecutor<T> {
             ControllerCommand::Sensor
         };
 
-        // disable LPM mode for smooth operation
-        self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
         self.command_sender.send_command(command).await?;
         
         // Wait for command to take effect
@@ -118,7 +121,7 @@ impl<T: CommandSender> CommandExecutor<T> {
         tokio::spawn(async move {
             loop {
                 if let Err(e) = command_sender.send_command(ControllerCommand::KeepAlive).await {
-                    log::error!("Failed to send keepalive: {}", e);
+                    error!("Failed to send keepalive: {}", e);
                 }
                 sleep(Duration::from_secs(interval_secs)).await;
             }

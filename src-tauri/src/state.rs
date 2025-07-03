@@ -2,11 +2,14 @@
 //! This module defines and manages the global application state.
 
 use std::sync::{Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex};
 use anyhow::{Result};
 use log::{info};
 use crate::core::BluetoothManager;
-use crate::mapping::mouse::MouseMapperSender; 
+use crate::mapping::mouse::MouseMapperSender;
+use crate::config::controller_config::ControllerConfig;
+use crate::config::mouse_mapper_config::MouseMapperConfig;
+use tauri::AppHandle;
 
 /// Global application state
 pub struct AppState {
@@ -17,12 +20,16 @@ pub struct AppState {
 
 impl AppState {
     /// Creates a new AppState instance
-    pub async fn new() -> Result<Self> {
+    pub async fn new(app_handle: &AppHandle) -> Result<Self> {
         info!("Initializing BluetoothManager...");
-        let manager = BluetoothManager::new().await?;
+
+        let initial_controller_config = ControllerConfig::load_config(app_handle).await.ok();
+        let initial_mouse_mapper_config = MouseMapperConfig::load_config(app_handle).await.ok();
+
+        let manager = BluetoothManager::new(initial_controller_config).await?;
         Ok(Self {
             bluetooth_manager: Arc::new(Mutex::new(manager)),
-            mouse_sender: MouseMapperSender::new(),
+            mouse_sender: MouseMapperSender::new(initial_mouse_mapper_config.unwrap_or_default()),
         })
     }
 

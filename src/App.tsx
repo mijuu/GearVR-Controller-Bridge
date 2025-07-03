@@ -3,8 +3,12 @@ import { listen } from "@tauri-apps/api/event";
 import MainView from "./components/MainView";
 import StatusBar from "./components/StatusBar";
 import LogViewer from "./components/LogViewer";
+import ControllerView from "./components/ControllerView/ControllerView";
+import Settings from "./components/Settings";
 import { LogMessage } from "./components/LogViewer";
 import "./App.css";
+
+type AppView = 'main' | 'controller' | 'settings';
 
 function App() {
   // 状态管理
@@ -14,10 +18,21 @@ function App() {
   const [showLogs, setShowLogs] = useState(false); // 控制日志视图的显示/隐藏
   const [logs, setLogs] = useState<LogMessage[]>([]); // 日志状态
   const logListenerRef = useRef<(() => void) | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>('main'); // 新增：当前视图状态
 
   // 清除日志的函数
   const clearLogs = () => {
     setLogs([]);
+  };
+
+  // 处理控制器连接成功，切换到控制器状态视图
+  const handleControllerConnected = () => {
+    setCurrentView('controller');
+  };
+
+  // 处理视图切换
+  const handleViewChange = (view: AppView) => {
+    setCurrentView(view);
   };
 
   // 监听连接状态变化
@@ -113,7 +128,9 @@ function App() {
       </header>
 
       <main className="app-content">
-        <MainView />
+        {currentView === 'main' && <MainView onControllerConnected={handleControllerConnected} />}
+        {currentView === 'controller' && <ControllerView />}
+        {currentView === 'settings' && <Settings onBackToController={handleViewChange} />}
         {showLogs && (
           <div className="log-overlay">
             <LogViewer logs={logs} onClearLogs={clearLogs} />
@@ -127,6 +144,7 @@ function App() {
           deviceName={connectedDevice || undefined}
           showLogs={showLogs}
           setShowLogs={setShowLogs}
+          onViewChange={handleViewChange}
         />
       </footer>
 

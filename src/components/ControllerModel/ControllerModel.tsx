@@ -3,7 +3,7 @@ import { OrbitControls, useTexture } from "@react-three/drei";
 import { Euler, Quaternion, Mesh, MeshStandardMaterial } from "three";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { Suspense, useMemo, useRef } from "react";
-import { ControllerState } from "../ControllerStatus/ControllerStatus";
+import { ControllerState } from "../ControllerView/ControllerView";
 
 interface Controller3DViewProps {
   state: ControllerState | null;

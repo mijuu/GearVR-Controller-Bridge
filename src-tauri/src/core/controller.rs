@@ -3,9 +3,18 @@
 
 use serde::{Deserialize, Serialize};
 use std::time::{Duration};
+use std::path::Path;
 
 use ahrs::{Madgwick, Ahrs}; 
-use nalgebra::{Vector3, UnitQuaternion};
+use nalgebra::{Vector3, UnitQuaternion, Matrix3};
+use std::sync::{Arc};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use anyhow::{Result, anyhow};
+
+use crate::config::controller_config::{ControllerConfig};
 
 /// Represents the state of the GearVR controller
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,23 +64,6 @@ pub struct TouchpadState {
     pub y: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ControllerConfig {
-    /// 原始传感器数据 (加速度计、陀螺仪、磁力计) 低通滤波的 alpha 值。
-    /// 控制传感器噪声的抑制程度。值越小滤波越强，延迟越大。
-    pub sensor_low_pass_alpha: f64,
-
-    /// 传感器时间步长 (delta_t) 平滑的 alpha 值。
-    /// 控制时间步长的稳定性。值越小平滑越强，但可能引入更多延迟。
-    pub delta_t_smoothing_alpha: f64,
-
-    // 你也可以添加其他的参数，例如：
-    /// 磁力计有效性的最大模长阈值 (μT)。
-    pub mag_norm_max_threshold: f64,
-    /// 磁力计有效性的最小模长阈值 (μT)。
-    pub mag_norm_min_threshold: f64,
-}
-
 /// Controller data parser
 pub struct ControllerParser {
     /// Last received state
@@ -98,23 +90,21 @@ pub struct ControllerParser {
     last_filtered_mag: Vector3<f64>,
 
     pub config: ControllerConfig,
+
+    /// Sender for data recording
+    data_record_sender: Option<mpsc::Sender<String>>,
+
+    /// Recorded magnetometer data for calibration
+    recorded_mag_data: Arc<Mutex<Vec<Vector3<f64>>>>,
+    /// Recorded gyroscope data for calibration
+    recorded_gyro_data: Arc<Mutex<Vec<Vector3<f64>>>>,
 }
 
-impl Default for ControllerConfig {
-    fn default() -> Self {
-        ControllerConfig {
-            sensor_low_pass_alpha: 0.8,
-            delta_t_smoothing_alpha: 0.8,
-            // https://github.com/uutzinger/gearVRC/blob/main/gearVRC.py#L90
-            mag_norm_max_threshold: 1.2 * 33078.93064435485 / 1000.0,
-            mag_norm_min_threshold: 0.8 * 33078.93064435485 / 1000.0,
-        }
-    }
-}
+
 
 impl ControllerParser {
     /// Creates a new controller parser
-    pub fn new() -> Self {
+    pub fn new(config: ControllerConfig) -> Self {
         // 1 / 68.96 ?
         let sample_period: f64 = 0.014499999999998181; 
         let beta: f64 = 0.1;
@@ -131,10 +121,160 @@ impl ControllerParser {
             last_filtered_accel: Vector3::zeros(),
             last_filtered_gyro: Vector3::zeros(),
             last_filtered_mag: Vector3::zeros(),
-            config: ControllerConfig::default(),
+            config,
+            data_record_sender: None,
+            recorded_mag_data: Arc::new(Mutex::new(Vec::new())),
+            recorded_gyro_data: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// Starts recording sensor data to a CSV file.
+    pub fn start_data_recording(&mut self, file_path: &Path) {
+        let (tx, mut rx) = mpsc::channel::<String>(100); // Buffer for 100 messages
+        self.data_record_sender = Some(tx);
+
+        let recorded_mag_data_arc = self.recorded_mag_data.clone(); // Clone for the async task
+        let recorded_gyro_data_arc = self.recorded_gyro_data.clone();
+        let file_path_str = file_path.to_string_lossy().into_owned(); // Clone for the async task
+        let task_file_path_str = file_path_str.clone();
+        let task_path = file_path.to_path_buf();
+
+        tokio::spawn(async move {
+            let mut file = match File::create(&task_path).await {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("Failed to create data recording file {}: {}", task_file_path_str, e);
+                    return;
+                }
+            };
+
+            // Write CSV header
+            if let Err(e) = file.write_all(b"timestamp_us,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,mag_x,mag_y,mag_z\n").await {
+                eprintln!("Failed to write CSV header to {}: {}", task_file_path_str, e);
+                return;
+            }
+
+            let mut recorded_mag_data_guard = recorded_mag_data_arc.lock().await;
+            recorded_mag_data_guard.clear(); // Clear previous data
+
+            let mut recorded_gyro_data_guard = recorded_gyro_data_arc.lock().await;
+            recorded_gyro_data_guard.clear(); // Clear previous data
+
+            while let Some(data_line) = rx.recv().await {
+                // Parse mag and gyro data from line and push to respective recorded_data_guard
+                let parts: Vec<&str> = data_line.trim().split(',').collect();
+                if parts.len() == 10 {
+                    if let (Ok(_accel_x), Ok(_accel_y), Ok(_accel_z),
+                            Ok(gyro_x), Ok(gyro_y), Ok(gyro_z),
+                            Ok(mag_x), Ok(mag_y), Ok(mag_z)) = (
+                        parts[1].parse::<f64>(), parts[2].parse::<f64>(), parts[3].parse::<f64>(),
+                        parts[4].parse::<f64>(), parts[5].parse::<f64>(), parts[6].parse::<f64>(),
+                        parts[7].parse::<f64>(), parts[8].parse::<f64>(), parts[9].parse::<f64>(),
+                    ) {
+                        recorded_mag_data_guard.push(Vector3::new(mag_x, mag_y, mag_z));
+                        recorded_gyro_data_guard.push(Vector3::new(gyro_x, gyro_y, gyro_z));
+                    }
+                }
+
+                if let Err(e) = file.write_all(data_line.as_bytes()).await {
+                    eprintln!("Failed to write data to {}: {}", task_file_path_str, e);
+                    break;
+                }
+            }
+            eprintln!("Data recording to {} stopped.", task_file_path_str);
+        });
+        eprintln!("Data recording to {} started.", file_path_str);
+    }
+
+    /// Stops recording sensor data.
+    pub fn stop_data_recording(&mut self) {
+        self.data_record_sender.take(); // Drop the sender, which will close the channel
+        eprintln!("Stopping data recording.");
+    }
+    
+    /// Clears recorded sensor data.
+    /// If `clear_mag` is true, clears magnetometer data.
+    /// If `clear_gyro` is true, clears gyroscope data.
+    pub async fn clear_recorded_data(&mut self, clear_mag: bool, clear_gyro: bool) {
+        if clear_mag {
+            let mut mag_data = self.recorded_mag_data.lock().await;
+            mag_data.clear();
+            eprintln!("Cleared recorded magnetometer data.");
+        }
+        if clear_gyro {
+            let mut gyro_data = self.recorded_gyro_data.lock().await;
+            gyro_data.clear();
+            eprintln!("Cleared recorded gyroscope data.");
         }
     }
     
+    /// Performs magnetometer calibration using recorded data.
+    pub async fn perform_mag_calibration(&mut self) -> Result<()> {
+        let recorded_mag_data_guard = self.recorded_mag_data.lock().await;
+        let mag_data = &*recorded_mag_data_guard;
+
+        if mag_data.is_empty() {
+            return Err(anyhow!("No magnetometer data recorded for calibration."));
+        }
+
+        // --- 简化的椭球拟合算法占位符 ---
+        // 实际的椭球拟合算法会更复杂，通常需要外部库或更详细的数学实现。
+        // 这里我们只是计算一个简单的平均值作为硬铁偏置的估计，
+        // 软铁矩阵暂时设为单位矩阵。
+        // 这是一个非常简化的示例，仅用于演示流程。
+        // 真正的校准需要确保数据覆盖所有方向，并使用最小二乘法等方法拟合椭球。
+
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_z = 0.0;
+        for v in mag_data.iter() {
+            sum_x += v.x;
+            sum_y += v.y;
+            sum_z += v.z;
+        }
+
+        let count = mag_data.len() as f64;
+        let estimated_hard_iron_bias = Vector3::new(sum_x / count, sum_y / count, sum_z / count);
+        let estimated_soft_iron_matrix = Matrix3::identity(); // 暂时使用单位矩阵
+
+        self.config.mag_calibration.hard_iron_bias = estimated_hard_iron_bias;
+        self.config.mag_calibration.soft_iron_matrix = estimated_soft_iron_matrix;
+
+        eprintln!("Magnetometer calibration performed.");
+        eprintln!("Estimated Hard Iron Bias: {:?}", self.config.mag_calibration.hard_iron_bias);
+        eprintln!("Estimated Soft Iron Matrix: {:?}", self.config.mag_calibration.soft_iron_matrix);
+
+        Ok(())
+    }
+
+    /// Performs gyroscope calibration using recorded data.
+    pub async fn perform_gyro_calibration(&mut self) -> Result<()> {
+        let recorded_gyro_data_guard = self.recorded_gyro_data.lock().await;
+        let gyro_data = &*recorded_gyro_data_guard;
+
+        if gyro_data.is_empty() {
+            return Err(anyhow!("No gyroscope data recorded for calibration."));
+        }
+
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_z = 0.0;
+        for v in gyro_data.iter() {
+            sum_x += v.x;
+            sum_y += v.y;
+            sum_z += v.z;
+        }
+
+        let count = gyro_data.len() as f64;
+        let estimated_gyro_bias = Vector3::new(sum_x / count, sum_y / count, sum_z / count);
+
+        self.config.gyro_calibration.zero_bias = estimated_gyro_bias;
+
+        eprintln!("Gyroscope calibration performed.");
+        eprintln!("Estimated Gyro Bias: {:?}", self.config.gyro_calibration.zero_bias);
+
+        Ok(())
+    }
     /// Parses raw data from the controller
     pub fn parse_data(&mut self, data: &[u8]) -> Option<ControllerState> {
         if data.len() < 59 {
@@ -166,7 +306,7 @@ impl ControllerParser {
 
         // 9.80665 / 2048.0 = 0.00478840332
         let acc_val_factor = 0.00478840332;
-        let accelerometer = Vector3::new(
+        let raw_accelerometer = Vector3::new(
             i16::from_le_bytes([data[4], data[5]]) as f64 * acc_val_factor,
             i16::from_le_bytes([data[6], data[7]]) as f64 * acc_val_factor,
             i16::from_le_bytes([data[8], data[9]]) as f64 * acc_val_factor,
@@ -174,24 +314,42 @@ impl ControllerParser {
 
         // 0.017453292 / 14.285 = 0.001221791529
         let gyr_val_factor = 0.001221791529;
-        let gyroscope = Vector3::new(
-            i16::from_le_bytes([data[10], data[11]]) as f64 * gyr_val_factor, 
+        let raw_gyroscope = Vector3::new(
+            i16::from_le_bytes([data[10], data[11]]) as f64 * gyr_val_factor,
             i16::from_le_bytes([data[12], data[13]]) as f64 * gyr_val_factor,
             i16::from_le_bytes([data[14], data[15]]) as f64 * gyr_val_factor,
         );
 
-        // 32-37， 48-53？
-        let mag_val_factor = 0.06;
-        let magnetometer = Vector3::new(
+        // Y, X, Z
+        let mag_val_factor = 0.0045;
+        let raw_magnetometer = Vector3::new(
             i16::from_le_bytes([data[48], data[49]]) as f64 * mag_val_factor,
             i16::from_le_bytes([data[50], data[51]]) as f64 * mag_val_factor,
             i16::from_le_bytes([data[52], data[53]]) as f64 * mag_val_factor,
         );
 
+        // Record raw data if recording is active
+        if let Some(sender) = &self.data_record_sender {
+            let timestamp_us = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as u64;
+            let line = format!("{},{},{},{},{},{},{},{},{},{}\n",
+                timestamp_us,
+                raw_accelerometer.x, raw_accelerometer.y, raw_accelerometer.z,
+                raw_gyroscope.x, raw_gyroscope.y, raw_gyroscope.z,
+                raw_magnetometer.x, raw_magnetometer.y, raw_magnetometer.z
+            );
+            if let Err(e) = sender.try_send(line) {
+                eprintln!("Failed to send data for recording: {}", e);
+            }
+        }
+
+        // Apply calibration for real-time use and AHRS
+        let calibrated_gyro = raw_gyroscope - self.config.gyro_calibration.zero_bias;
+        let calibrated_mag = self.config.mag_calibration.soft_iron_matrix * (raw_magnetometer - self.config.mag_calibration.hard_iron_bias);
+
         let filter_alpha_sensor = self.config.sensor_low_pass_alpha;
-        let current_accel_filtered = accelerometer * filter_alpha_sensor + self.last_filtered_accel * (1.0 - filter_alpha_sensor);
-        let current_gyro_filtered = gyroscope * filter_alpha_sensor + self.last_filtered_gyro * (1.0 - filter_alpha_sensor);
-        let current_mag_filtered = magnetometer * filter_alpha_sensor + self.last_filtered_mag * (1.0 - filter_alpha_sensor);
+        let current_accel_filtered = raw_accelerometer * filter_alpha_sensor + self.last_filtered_accel * (1.0 - filter_alpha_sensor);
+        let current_gyro_filtered = calibrated_gyro * filter_alpha_sensor + self.last_filtered_gyro * (1.0 - filter_alpha_sensor);
+        let current_mag_filtered = calibrated_mag * filter_alpha_sensor + self.last_filtered_mag * (1.0 - filter_alpha_sensor);
 
         self.last_filtered_accel = current_accel_filtered;
         self.last_filtered_gyro = current_gyro_filtered;
@@ -232,8 +390,16 @@ impl ControllerParser {
         let sample_period_ref: &mut f64 = self.ahrs_filter.sample_period_mut();
         *sample_period_ref = self.smoothed_delta_t;
 
-        // 更新 AHRS 滤波器。
-        let update_result = self.ahrs_filter.update(&current_gyro_filtered, &nalgebra_accel, &current_mag_filtered);
+        // 检查磁力计数据是否在有效范围内
+        let mag_norm = calibrated_mag.norm(); // 使用校准后的磁力计数据进行范数检查
+        let update_result = if mag_norm > self.config.mag_norm_min_threshold && mag_norm < self.config.mag_norm_max_threshold {
+            // eprintln!("Magnetometer data in range (norm: {}), using full AHRS update.", mag_norm);
+            self.ahrs_filter.update(&current_gyro_filtered, &nalgebra_accel, &calibrated_mag) // 使用校准后的磁力计数据
+        } else {
+            // 磁力计数据无效（可能受到干扰），仅使用 IMU 更新
+            // eprintln!("Magnetometer data out of range (norm: {}), using IMU update only.", mag_norm);
+            self.ahrs_filter.update_imu(&current_gyro_filtered, &nalgebra_accel)
+        };
         // 如果更新失败，打印错误并返回 None（或保留上次的姿态）
         if let Err(e) = update_result {
             eprintln!("AHRS update failed: {:?}", e); 
@@ -248,9 +414,9 @@ impl ControllerParser {
                 buttons,
                 touchpad,
                 orientation,
-                accelerometer,
-                gyroscope,
-                magnetometer,
+                accelerometer: current_accel_filtered,
+                gyroscope: current_gyro_filtered,
+                magnetometer: current_mag_filtered,
                 temperature,
             };
             self.last_state = Some(state.clone());
@@ -280,9 +446,9 @@ impl ControllerParser {
             buttons,
             touchpad,
             orientation: final_display_orientation,
-            accelerometer,
-            gyroscope,
-            magnetometer,
+            accelerometer: current_accel_filtered,
+            gyroscope: current_gyro_filtered,
+            magnetometer: current_mag_filtered,
             temperature,
         };
         
@@ -295,6 +461,6 @@ impl ControllerParser {
 
 impl Default for ControllerParser {
     fn default() -> Self {
-        Self::new()
+        Self::new(ControllerConfig::default())
     }
 }

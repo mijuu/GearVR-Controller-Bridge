@@ -5,9 +5,10 @@ interface StatusBarProps {
   deviceName?: string;
   showLogs: boolean;
   setShowLogs: (show: boolean) => void;
+  onViewChange: (view: 'main' | 'controller' | 'settings') => void;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs, onViewChange }) => {
   return (
     <div className="status-bar">
       <div className="status-left">
@@ -27,6 +28,13 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           onClick={() => setShowLogs(!showLogs)}
         >
           {showLogs ? '隐藏日志' : '显示日志'}
+        </div>
+        <div 
+          className="settings-link" 
+          onClick={() => onViewChange('settings')}
+          style={{ marginLeft: '1rem' }}
+        >
+          设置
         </div>
       </div>
 

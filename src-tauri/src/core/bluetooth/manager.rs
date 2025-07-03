@@ -3,12 +3,14 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc};
+use std::path::Path;
+use tokio::time::{sleep, Duration};
 
 use anyhow::{anyhow, Result};
 use bluest::{Adapter, Device};
 use log::{info, error};
-use tokio::sync::Mutex;
-use tauri::{Emitter, Window};
+use tokio::sync::{Mutex};
+use tauri::{Emitter, Manager, Window};
 
 use crate::mapping::mouse::MouseMapperSender;
 use crate::core::bluetooth::commands::CommandExecutor;
@@ -25,7 +27,9 @@ use crate::core::bluetooth::constants::{
     UUID_BATTERY_SERVICE,
     UUID_BATTERY_LEVEL,
 };
-use crate::core::controller::ControllerParser;
+use crate::core::controller::{ControllerParser};
+use crate::config::controller_config::ControllerConfig;
+use crate::utils::ensure_directory_exists;
 
 /// Manages Bluetooth operations
 pub struct BluetoothManager {
@@ -45,14 +49,14 @@ pub struct BluetoothManager {
 
 impl BluetoothManager {
     /// Creates a new BluetoothManager
-    pub async fn new() -> Result<Self> {
+    pub async fn new(initial_config: Option<ControllerConfig>) -> Result<Self> {
         let adapter = Adapter::default().await
             .ok_or_else(|| anyhow!("No Bluetooth adapter found"))?;
         adapter.wait_available().await?;
         info!("Bluetooth adapter is available.");
         let devices = Arc::new(Mutex::new(HashMap::new()));
 
-        let controller_parser = Arc::new(Mutex::new(ControllerParser::new()));
+        let controller_parser = Arc::new(Mutex::new(ControllerParser::new(initial_config.unwrap_or_default())));
         let connection_manager = ConnectionManager::new(adapter.clone(), MAX_CONNECT_RETRIES.try_into().unwrap(), CONNECT_RETRY_DELAY_MS);
         let scanner = BluetoothScanner::new(adapter.clone(), devices.clone());
         let notification_handler = NotificationHandler::new(controller_parser.clone());
@@ -233,4 +237,124 @@ impl BluetoothManager {
         Ok(Some(battery_data[0]))
     }
 
+    /// Starts the calibration wizard.
+    pub async fn start_calibration_wizard(&self, window: Window) -> Result<()> {
+        // Step 1: Prepare for calibration
+        window.emit("calibration-step", "Starting calibration... Please prepare to move the controller.")?;
+        let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
+
+        let cache_dir = window.app_handle().path().app_config_dir()?;
+        let mut file_path = cache_dir.join("calibration_data");
+        ensure_directory_exists(&file_path).await?;
+
+        let file_name = format!("sensor_data_{}.csv", timestamp);
+        file_path.push(file_name);
+
+        // Clear any previously recorded data
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.clear_recorded_data(true, true).await;
+        drop(controller_parser);
+
+        // Step 2: Magnetometer calibration data collection
+        window.emit("calibration-step", "Slowly rotate the controller in a figure-eight pattern for magnetometer calibration.")?;
+        sleep(Duration::from_secs(5)).await;
+        self.start_calibration_recording(file_path.as_path()).await?;
+        sleep(Duration::from_secs(10)).await;
+
+        window.emit("calibration-step", "Slowly tilt the controller up and down.")?;
+        sleep(Duration::from_secs(5)).await;
+
+        window.emit("calibration-step", "Slowly rotate the controller horizontally.")?;
+        sleep(Duration::from_secs(5)).await;
+
+        self.stop_calibration_recording().await?;
+        window.emit("calibration-step", "Magnetometer data collection complete. Performing calibration...")?;
+
+        // Perform magnetometer calibration
+        match self.perform_mag_calibration().await {
+            Ok(_) => {
+                window.emit("calibration-step", "Magnetometer calibration successful!")?;
+            }
+            Err(e) => {
+                error!("Magnetometer calibration failed: {}", e);
+                window.emit("calibration-step", "Magnetometer calibration failed. Please try again.")?;
+                window.emit("calibration-finished", false)?;
+                return Ok(());
+            }
+        }
+
+        // Step 3: Gyroscope calibration data collection
+        window.emit("calibration-step", "Please place the controller still on a flat surface for gyroscope calibration.")?;
+        // Clear magnetometer data, but keep gyroscope data for now
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.clear_recorded_data(false, true).await;
+        drop(controller_parser);
+
+        sleep(Duration::from_secs(10)).await;
+        // Re-start recording for gyroscope calibration
+        self.start_calibration_recording(file_path.as_path()).await?;
+        sleep(Duration::from_secs(5)).await;
+        self.stop_calibration_recording().await?;
+        window.emit("calibration-step", "Gyroscope data collection complete. Performing calibration...")?;
+
+        // Perform gyroscope calibration
+        match self.perform_gyro_calibration().await {
+            Ok(_) => {
+                window.emit("calibration-step", "Gyroscope calibration successful!")?;
+            }
+            Err(e) => {
+                error!("Gyroscope calibration failed: {}", e);
+                window.emit("calibration-step", "Gyroscope calibration failed. Please try again.")?;
+                window.emit("calibration-finished", false)?;
+                return Ok(());
+            }
+        }
+
+        self.save_controller_config(window.clone()).await?;
+        window.emit("calibration-step", "All calibrations successful!")?;
+        window.emit("calibration-finished", true)?;
+
+        Ok(())
+    }
+
+    /// Starts recording sensor data for calibration.
+    async fn start_calibration_recording(&self, file_path: &Path) -> Result<()> {
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.start_data_recording(file_path);
+        Ok(())
+    }
+
+    /// Stops recording sensor data for calibration.
+    async fn stop_calibration_recording(&self) -> Result<()> {
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.stop_data_recording();
+        Ok(())
+    }
+
+    /// Performs magnetometer calibration using recorded data.
+    async fn perform_mag_calibration(&self) -> Result<()> {
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.perform_mag_calibration().await
+    }
+
+    /// Performs gyroscope calibration using recorded data.
+    async fn perform_gyro_calibration(&self) -> Result<()> {
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        controller_parser.perform_gyro_calibration().await
+    }
+
+    /// Saves the current controller config to a configuration file.
+    async fn save_controller_config(&self, window: Window) -> Result<()> {
+        let controller_parser_arc = self.notification_handler.get_controller_parser();
+        let mut controller_parser = controller_parser_arc.lock().await;
+        eprintln!("Saving controller config...");
+        // The config is now saved via the ControllerConfig struct
+        controller_parser.config.save_config(window.app_handle()).await
+    }
 }

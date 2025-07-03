@@ -2,87 +2,10 @@
 //! This module maps controller inputs to mouse and keyboard actions using the enigo library.
 
 use enigo::{Enigo, KeyboardControllable, MouseButton, MouseControllable};
-use log::info;
 use nalgebra::UnitQuaternion;
-use serde::{Deserialize, Serialize};
 
 use crate::core::controller::{ButtonState, ControllerState, TouchpadState};
-
-/// Configuration for button mappings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ButtonMapping {
-    /// Trigger button mapping
-    pub trigger: Option<String>,
-    /// Home button mapping
-    pub home: Option<String>,
-    /// Back button mapping
-    pub back: Option<String>,
-    /// Volume up button mapping
-    pub volume_up: Option<String>,
-    /// Volume down button mapping
-    pub volume_down: Option<String>,
-    /// Touchpad click mapping
-    pub touchpad: Option<String>,
-}
-
-impl Default for ButtonMapping {
-    fn default() -> Self {
-        ButtonMapping {
-            trigger: Some("left".to_string()),   // Left mouse button by default
-            home: Some("esc".to_string()),       // Escape key by default
-            back: Some("backspace".to_string()), // Backspace key by default
-            volume_up: Some("volume_up".to_string()), // Volume up
-            volume_down: Some("volume_down".to_string()), // Volume down
-            touchpad: Some("right".to_string()), // Right mouse button by default
-        }
-    }
-}
-
-/// Mouse movement mode
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum MouseMode {
-    /// Use controller air mouse to control mouse movement
-    AirMouse,
-    /// Use touchpad to control mouse movement (like laptop touchpad)
-    Touchpad,
-}
-
-/// Mouse mapper configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MouseMapperConfig {
-    /// Mouse movement mode
-    pub mode: MouseMode,
-    /// Button mappings
-    pub button_mapping: ButtonMapping,
-    /// Mouse sensitivity for air mouse mode
-    pub air_mouse_sensitivity: f32,
-    /// Mouse sensitivity for touchpad mode
-    pub touchpad_sensitivity: f32,
-    /// Acceleration factor for touchpad mode. 0.0 means no acceleration.
-    pub touchpad_acceleration: f32,
-    /// The speed threshold to activate acceleration. Below this, movement is linear (precise).
-    /// The unit is abstract, related to (distance_squared / time_delta).
-    pub touchpad_acceleration_threshold: f32,
-    /// The horizontal field of view (in degrees) that maps to the full screen width.
-    pub air_mouse_fov: f32,
-    /// Rotational speed threshold (e.g., in degrees per second) to activate air mouse mode.
-    pub air_mouse_activation_threshold: f32,
-}
-
-impl Default for MouseMapperConfig {
-    fn default() -> Self {
-        MouseMapperConfig {
-            mode: MouseMode::AirMouse,
-            button_mapping: ButtonMapping::default(),
-            air_mouse_sensitivity: 10.0,
-            touchpad_sensitivity: 500.0,
-            touchpad_acceleration: 1.2,
-            touchpad_acceleration_threshold: 0.0002,
-            air_mouse_fov: 40.0,
-            air_mouse_activation_threshold: 5.0,
-        }
-    }
-}
+use crate::config::mouse_mapper_config::{ButtonMapping, MouseMode, MouseMapperConfig};
 
 /// Maps controller inputs to mouse and keyboard actions
 pub struct MouseMapper {
@@ -106,24 +29,7 @@ pub struct MouseMapper {
 
 impl MouseMapper {
     /// Creates a new mouse mapper with default configuration
-    pub fn new() -> Self {
-        let enigo = Enigo::new();
-        let (x, y) = enigo.mouse_location();
-        Self {
-            enigo,
-            config: MouseMapperConfig::default(),
-            last_state: None,
-            remainder_x: 0.0,
-            remainder_y: 0.0,
-            target_screen_x: x,
-            target_screen_y: y,
-            is_touchpad_active: false,
-            is_air_mouse_active: false,
-        }
-    }
-
-    /// Creates a new mouse mapper with custom configuration
-    pub fn with_config(config: MouseMapperConfig) -> Self {
+    pub fn new(config: MouseMapperConfig) -> Self {
         let enigo = Enigo::new();
         let (x, y) = enigo.mouse_location();
         Self {
@@ -417,6 +323,6 @@ impl MouseMapper {
 
 impl Default for MouseMapper {
     fn default() -> Self {
-        Self::new()
+        Self::new(MouseMapperConfig::default())
     }
 }

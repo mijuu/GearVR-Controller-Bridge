@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from "@react-three/fiber";
-import Controller3DView from "../Controller3DView/Controller3DView";
-import "./ControllerStatus.css";
+import ControllerModel from "../ControllerModel/ControllerModel";
+import './ControllerView.css';
 
 export interface ControllerState {
     timestamp: number;
@@ -92,7 +92,7 @@ export default function ControllerStatus() {
             <div className="top-section">
                 <div className="model-view">
                     <Canvas>
-                        <Controller3DView state={state} />
+                        <ControllerModel state={state} />
                     </Canvas>
                 </div>
                 <div className="right-panel">
