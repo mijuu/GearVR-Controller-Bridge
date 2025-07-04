@@ -14,6 +14,7 @@ enum MouseMapperCommand {
 /// A clonable handle that sends commands to the dedicated MouseMapper thread.
 #[derive(Clone)]
 pub struct MouseMapperSender {
+    pub config: MouseMapperConfig,
     tx: mpsc::Sender<MouseMapperCommand>,
 }
 
@@ -54,7 +55,7 @@ impl MouseMapperSender {
             }
         });
 
-        Self { tx }
+        Self { config, tx }
     }
 
     pub async fn update(&self, state: ControllerState) -> Result<()> {

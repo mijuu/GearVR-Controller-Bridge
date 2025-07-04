@@ -11,7 +11,7 @@ pub mod logging;
 pub mod utils;
 
 // Import our modules
-use commands::{connect_to_device, disconnect, start_scan, stop_scan, get_battery_level, turn_off_controller, start_calibration_wizard};
+use commands::{connect_to_device, disconnect, start_scan, stop_scan, get_battery_level, turn_off_controller, start_mag_calibration_wizard, start_gyro_calibration, get_controller_config, set_controller_config, get_mouse_mapper_config, set_mouse_mapper_config};
 use state::AppState;
 use log::{info};
 use tauri::Manager;
@@ -30,7 +30,12 @@ pub fn run() {
             get_battery_level,
             disconnect,
             turn_off_controller,
-            start_calibration_wizard,
+            start_mag_calibration_wizard,
+            start_gyro_calibration,
+            get_controller_config,
+            set_controller_config,
+            get_mouse_mapper_config,
+            set_mouse_mapper_config,
         ])
         // Setup our application state
         .setup(move |app| {

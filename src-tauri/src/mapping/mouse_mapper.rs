@@ -5,7 +5,7 @@ use enigo::{Enigo, KeyboardControllable, MouseButton, MouseControllable};
 use nalgebra::UnitQuaternion;
 
 use crate::core::controller::{ButtonState, ControllerState, TouchpadState};
-use crate::config::mouse_mapper_config::{ButtonMapping, MouseMode, MouseMapperConfig};
+use crate::config::mouse_mapper_config::{MouseMode, MouseMapperConfig};
 
 /// Maps controller inputs to mouse and keyboard actions
 pub struct MouseMapper {
@@ -308,16 +308,6 @@ impl MouseMapper {
 
         // 4. 执行这一小步平滑移动
         self.enigo.mouse_move_to(new_x, new_y);
-    }
-
-    /// Changes the mouse movement mode
-    pub fn set_mode(&mut self, mode: MouseMode) {
-        self.config.mode = mode;
-    }
-
-    /// Updates the button mapping configuration
-    pub fn update_button_mapping(&mut self, mapping: ButtonMapping) {
-        self.config.button_mapping = mapping;
     }
 }
 

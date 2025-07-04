@@ -2,8 +2,11 @@
 //! This module defines all the commands that can be invoked from the frontend.
 
 use crate::state::AppState;
+use crate::config::mouse_mapper_config::MouseMapperConfig;
+use crate::config::controller_config::ControllerConfig;
 use anyhow::{Result};
-use tauri::{State, Window};
+use tauri::{AppHandle, State, Window};
+use log::{error};
 
 /// Scans for Bluetooth devices with real-time updates through events
 ///
@@ -54,9 +57,10 @@ pub async fn connect_to_device(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
-    let mouse_sender = app_state.mouse_sender.clone(); 
+    let mouse_sender_guard = app_state.mouse_sender.lock().await;
+    let mouse_sender_clone = mouse_sender_guard.clone();
     
-    bluetooth_manager_guard.connect_device(window, &device_id, mouse_sender).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.connect_device(window, &device_id, mouse_sender_clone).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -93,14 +97,89 @@ pub async fn turn_off_controller(app_state: State<'_, AppState>) -> Result<(), S
     bluetooth_manager_guard.turn_off_controller().await.map_err(|e| e.to_string())
 }
 
-/// Starts the calibration wizard.
+/// Starts the magnetometer calibration wizard.
 #[tauri::command]
-pub async fn start_calibration_wizard(
+pub async fn start_mag_calibration_wizard(
     window: Window,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
-    bluetooth_manager_guard.start_calibration_wizard(window).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.start_mag_calibration_wizard(window).await.map_err(|e| e.to_string())
+}
+
+/// Starts the gyroscope calibration.
+#[tauri::command]
+pub async fn start_gyro_calibration(
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    bluetooth_manager_guard.start_gyro_calibration(window).await.map_err(|e| e.to_string())
+}
+
+/// Gets the current controller configuration.
+#[tauri::command]
+pub async fn get_controller_config(
+    app_state: State<'_, AppState>,
+) -> Result<ControllerConfig, String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    Ok(bluetooth_manager_guard.notification_handler.get_controller_parser().lock().await.config.clone())
+}
+
+/// Sets the controller configuration.
+#[tauri::command]
+pub async fn set_controller_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+    config: ControllerConfig,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    let controller_parser_arc  = bluetooth_manager_guard
+        .notification_handler
+        .get_controller_parser();
+    let mut controller_parser_guard = controller_parser_arc.lock().await;
+
+    // Update the in-memory config
+    controller_parser_guard.config = config;
+    if let Err(e) = controller_parser_guard.config.save_config(&app_handle).await {
+        error!("Failed to save controller config: {}", e)
+    }
+
+    Ok(())
+}
+
+/// Gets the current mouse mapper configuration.
+#[tauri::command]
+pub async fn get_mouse_mapper_config(
+    app_state: State<'_, AppState>,
+) -> Result<MouseMapperConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    Ok(mouse_sender_guard.config.clone())
+}
+
+/// Sets the mouse mapper configuration.
+#[tauri::command]
+pub async fn set_mouse_mapper_config(
+    config: MouseMapperConfig,
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    mouse_sender_guard.config = config;
+    if let Err(e) = mouse_sender_guard.config.save_config(&app_handle).await {
+        error!("Failed to save mouse mapper config: {}", e)
+    }
+
+    Ok(())
 }

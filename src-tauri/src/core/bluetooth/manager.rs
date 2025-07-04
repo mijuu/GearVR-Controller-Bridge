@@ -44,19 +44,19 @@ pub struct BluetoothManager {
     /// Bluetooth scanner
     scanner: BluetoothScanner,
     /// Notification handler
-    notification_handler: NotificationHandler,
+    pub notification_handler: NotificationHandler,
 }
 
 impl BluetoothManager {
     /// Creates a new BluetoothManager
-    pub async fn new(initial_config: Option<ControllerConfig>) -> Result<Self> {
+    pub async fn new(config: ControllerConfig) -> Result<Self> {
         let adapter = Adapter::default().await
             .ok_or_else(|| anyhow!("No Bluetooth adapter found"))?;
         adapter.wait_available().await?;
         info!("Bluetooth adapter is available.");
         let devices = Arc::new(Mutex::new(HashMap::new()));
 
-        let controller_parser = Arc::new(Mutex::new(ControllerParser::new(initial_config.unwrap_or_default())));
+        let controller_parser = Arc::new(Mutex::new(ControllerParser::new(config)));
         let connection_manager = ConnectionManager::new(adapter.clone(), MAX_CONNECT_RETRIES.try_into().unwrap(), CONNECT_RETRY_DELAY_MS);
         let scanner = BluetoothScanner::new(adapter.clone(), devices.clone());
         let notification_handler = NotificationHandler::new(controller_parser.clone());
@@ -167,35 +167,6 @@ impl BluetoothManager {
         command_executor.turn_off_controller().await
     }
 
-    /// Calibrate the controller
-    pub async fn calibrate_controller(&self) -> Result<()> {
-        let connected_state = {
-            let connected_state_guard = self.connected_state.lock().await;
-            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
-        };
-        
-        // Find write characteristic
-        let service = connected_state.device
-            .discover_services_with_uuid(UUID_CONTROLLER_SERVICE).await?;
-        
-        let controller_service = service
-            .first()
-            .ok_or_else(|| anyhow!("Controller service not found"))?;
-
-            let characteristics = controller_service.characteristics().await?;
-        
-        let write_char = characteristics
-            .iter()
-            .find(|c| c.uuid() == UUID_CONTROLLER_WRITE_CHAR)
-            .ok_or_else(|| anyhow!("Write characteristic not found"))?;
-        
-        // Create command executor and send calibrate command
-        let command_sender = BluestCommandSender::new(write_char.clone());
-        let command_executor = CommandExecutor::new(command_sender);
-        
-        command_executor.calibrate_controller().await
-    }
-
     /// Get battery level
     pub async fn get_battery_level(&self, window: Window) -> Result<Option<u8>> {
         let connected_state = {
@@ -238,29 +209,29 @@ impl BluetoothManager {
     }
 
     /// Starts the calibration wizard.
-    pub async fn start_calibration_wizard(&self, window: Window) -> Result<()> {
+    pub async fn start_mag_calibration_wizard(&self, window: Window) -> Result<()> {
         // Step 1: Prepare for calibration
-        window.emit("calibration-step", "Starting calibration... Please prepare to move the controller.")?;
+        window.emit("calibration-step", "Starting magnetometer calibration...")?;
         let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
 
         let cache_dir = window.app_handle().path().app_config_dir()?;
         let mut file_path = cache_dir.join("calibration_data");
         ensure_directory_exists(&file_path).await?;
 
-        let file_name = format!("sensor_data_{}.csv", timestamp);
+        let file_name = format!("mag_calibration_data_{}.csv", timestamp);
         file_path.push(file_name);
 
-        // Clear any previously recorded data
+        // Clear any previously recorded data for mag
         let controller_parser_arc = self.notification_handler.get_controller_parser();
         let mut controller_parser = controller_parser_arc.lock().await;
-        controller_parser.clear_recorded_data(true, true).await;
-        drop(controller_parser);
+        controller_parser.clear_recorded_data(true, false).await; // Clear only mag data
+        drop(controller_parser); // Drop the guard to release the lock
 
-        // Step 2: Magnetometer calibration data collection
-        window.emit("calibration-step", "Slowly rotate the controller in a figure-eight pattern for magnetometer calibration.")?;
+        // Step 2: Magnetometer calibration data collection (movement)
+        window.emit("calibration-step", "Take the controller and slowly rotate the controller in a figure-eight pattern for magnetometer calibration.")?;
         sleep(Duration::from_secs(5)).await;
         self.start_calibration_recording(file_path.as_path()).await?;
-        sleep(Duration::from_secs(10)).await;
+        sleep(Duration::from_secs(10)).await; // Duration for figure-eight
 
         window.emit("calibration-step", "Slowly tilt the controller up and down.")?;
         sleep(Duration::from_secs(5)).await;
@@ -273,9 +244,7 @@ impl BluetoothManager {
 
         // Perform magnetometer calibration
         match self.perform_mag_calibration().await {
-            Ok(_) => {
-                window.emit("calibration-step", "Magnetometer calibration successful!")?;
-            }
+            Ok(_) => {}
             Err(e) => {
                 error!("Magnetometer calibration failed: {}", e);
                 window.emit("calibration-step", "Magnetometer calibration failed. Please try again.")?;
@@ -284,26 +253,41 @@ impl BluetoothManager {
             }
         }
 
-        // Step 3: Gyroscope calibration data collection
-        window.emit("calibration-step", "Please place the controller still on a flat surface for gyroscope calibration.")?;
-        // Clear magnetometer data, but keep gyroscope data for now
+        self.save_controller_config(window.clone()).await?;
+        window.emit("calibration-step", "Magnetometer calibration successful!")?;
+        window.emit("calibration-finished", true)?;
+
+        Ok(())
+    }
+
+    pub async fn start_gyro_calibration(&self, window: Window) -> Result<()> {
+        // Step 1: Prepare for calibration
+        window.emit("calibration-step", "Starting gyroscope calibration...")?;
+        let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
+
+        let cache_dir = window.app_handle().path().app_config_dir()?;
+        let mut file_path = cache_dir.join("calibration_data");
+        ensure_directory_exists(&file_path).await?;
+
+        let file_name = format!("gyro_calibration_data_{}.csv", timestamp);
+        file_path.push(file_name);
+
+        // Clear any previously recorded data for gyro
         let controller_parser_arc = self.notification_handler.get_controller_parser();
         let mut controller_parser = controller_parser_arc.lock().await;
-        controller_parser.clear_recorded_data(false, true).await;
-        drop(controller_parser);
+        controller_parser.clear_recorded_data(false, true).await; // Clear only gyro data
+        drop(controller_parser); // Drop the guard to release the lock
 
-        sleep(Duration::from_secs(10)).await;
-        // Re-start recording for gyroscope calibration
+        // Step 2: Gyroscope calibration data collection (stillness)
+        window.emit("calibration-step", "Please place the controller still on a flat surface for gyroscope calibration.")?;
         self.start_calibration_recording(file_path.as_path()).await?;
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(5)).await; // Duration for stillness
         self.stop_calibration_recording().await?;
         window.emit("calibration-step", "Gyroscope data collection complete. Performing calibration...")?;
 
         // Perform gyroscope calibration
         match self.perform_gyro_calibration().await {
-            Ok(_) => {
-                window.emit("calibration-step", "Gyroscope calibration successful!")?;
-            }
+            Ok(_) => {}
             Err(e) => {
                 error!("Gyroscope calibration failed: {}", e);
                 window.emit("calibration-step", "Gyroscope calibration failed. Please try again.")?;
@@ -313,7 +297,7 @@ impl BluetoothManager {
         }
 
         self.save_controller_config(window.clone()).await?;
-        window.emit("calibration-step", "All calibrations successful!")?;
+        window.emit("calibration-step", "Gyroscope calibration successful!")?;
         window.emit("calibration-finished", true)?;
 
         Ok(())

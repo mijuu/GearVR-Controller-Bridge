@@ -15,7 +15,7 @@ use tauri::AppHandle;
 pub struct AppState {
     /// The Bluetooth manager instance
     pub bluetooth_manager: Arc<Mutex<BluetoothManager>>,
-    pub mouse_sender: MouseMapperSender,
+    pub mouse_sender: Arc<Mutex<MouseMapperSender>>,
 }
 
 impl AppState {
@@ -26,10 +26,11 @@ impl AppState {
         let initial_controller_config = ControllerConfig::load_config(app_handle).await.ok();
         let initial_mouse_mapper_config = MouseMapperConfig::load_config(app_handle).await.ok();
 
-        let manager = BluetoothManager::new(initial_controller_config).await?;
+        let bluetooth_manager = BluetoothManager::new(initial_controller_config.unwrap_or_default()).await?;
+        let mouse_sender = MouseMapperSender::new(initial_mouse_mapper_config.unwrap_or_default());
         Ok(Self {
-            bluetooth_manager: Arc::new(Mutex::new(manager)),
-            mouse_sender: MouseMapperSender::new(initial_mouse_mapper_config.unwrap_or_default()),
+            bluetooth_manager: Arc::new(Mutex::new(bluetooth_manager)),
+            mouse_sender: Arc::new(Mutex::new(mouse_sender)),
         })
     }
 
