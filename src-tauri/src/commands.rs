@@ -82,11 +82,11 @@ pub async fn get_battery_level(
 /// # Arguments
 /// * `state` - The application state
 #[tauri::command]
-pub async fn disconnect(window: Window, device_id: String, app_state: State<'_, AppState>) -> Result<(), String> {
+pub async fn disconnect(app_state: State<'_, AppState>) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
-    bluetooth_manager_guard.disconnect(window, &device_id).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard.disconnect().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -182,4 +182,24 @@ pub async fn set_mouse_mapper_config(
     }
 
     Ok(())
+}
+
+#[macro_export]
+macro_rules! export_commands {
+    () => {
+        tauri::generate_handler![
+            $crate::commands::start_scan,
+            $crate::commands::stop_scan,
+            $crate::commands::connect_to_device,
+            $crate::commands::get_battery_level,
+            $crate::commands::disconnect,
+            $crate::commands::turn_off_controller,
+            $crate::commands::start_mag_calibration_wizard,
+            $crate::commands::start_gyro_calibration,
+            $crate::commands::get_controller_config,
+            $crate::commands::set_controller_config,
+            $crate::commands::get_mouse_mapper_config,
+            $crate::commands::set_mouse_mapper_config,
+        ]
+    };
 }

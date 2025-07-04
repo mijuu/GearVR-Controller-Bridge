@@ -91,7 +91,7 @@ impl BluetoothManager {
         };
 
         if device.is_connected().await {
-            self.disconnect(window.clone(), device_id).await?;
+            self.disconnect().await?;
         }
 
         if cfg!(target_os = "windows") {
@@ -125,14 +125,13 @@ impl BluetoothManager {
     }
 
     /// Disconnects from the currently connected device
-    pub async fn disconnect(&mut self, window: Window, device_id: &str) -> Result<()> {
-        let device = {
-            let devices = self.devices.lock().await;
-            devices
-                .get(device_id)
-                .cloned()
-                .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
+    pub async fn disconnect(&mut self) -> Result<()> {
+        let connected_state = {
+            let connected_state_guard = self.connected_state.lock().await;
+            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
         };
+
+        let device = connected_state.device.clone();
 
         self.notification_handler.stop_notifications().await?;
         // drop ConnectedDeviceState
@@ -141,7 +140,7 @@ impl BluetoothManager {
             *connected_state_guard = None;
             info!("Connected state cleared, releasing device and characteristic objects.");
         }
-        self.connection_manager.disconnect(window, &device).await?;
+        self.connection_manager.disconnect(&device).await?;
 
         Ok(())
     }

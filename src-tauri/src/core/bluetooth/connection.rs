@@ -156,21 +156,21 @@ impl ConnectionManager {
     }
 
     /// Disconnect from the controller (bluest version)
-    pub async fn disconnect(&self, window: Window, device: &Device) -> Result<()> {
+    pub async fn disconnect(&self, device: &Device) -> Result<()> {
         if device.is_connected().await {
             info!("Disconnecting from device {}", device.id());
             if cfg!(target_os = "windows") {
-                info!("Windows does not support disconnecting from device, So we do nothing")
+                info!("Unpairing device on Windows to ensure a clean state for the next session...");
+                if let Err(e) = device.unpair().await {
+                    // 解除配对失败不应是致命错误，因为设备可能已经物理断开
+                    error!("Failed to unpair device {}: {}. This might cause issues on next launch.", device.id(), e);
+                } else {
+                    info!("Device successfully unpaired.");
+                }
             } else {
                 self.adapter.disconnect_device(device).await?;
             }
             info!("Successfully disconnected");
-            let payload = serde_json::json!({
-                "id": device.id().to_string(),
-            });
-            if let Err(e) = window.emit("device-disconnected", payload) {
-                error!("Failed to emit device-disconnected event: {}", e);
-            }
         } else {
             info!("Device {} not connected", device.id());
         }
