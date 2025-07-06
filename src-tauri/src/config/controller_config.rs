@@ -38,6 +38,10 @@ pub struct ControllerConfig {
     /// 控制时间步长的稳定性。值越小平滑越强，但可能引入更多延迟。
     pub delta_t_smoothing_alpha: f64,
 
+    /// Madgwick 滤波器的 beta 参数。
+    /// 控制对磁力计数据的信任程度。值越大，对磁力计的依赖越高，姿态收敛越快，但更容易受磁场干扰。
+    pub madgwick_beta: f64,
+
     /// 地区地磁强度 (uT)
     pub local_earth_mag_field: f64,
 
@@ -55,6 +59,7 @@ impl Default for ControllerConfig {
         ControllerConfig {
             sensor_low_pass_alpha: 1.0,
             delta_t_smoothing_alpha: 1.0,
+            madgwick_beta: 0.1,
             local_earth_mag_field,
             mag_calibration: MagCalibration::default(),
             gyro_calibration: GyroCalibration::default(),
@@ -108,3 +113,4 @@ impl ControllerConfig {
         Ok(())
     }
 }
+

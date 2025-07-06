@@ -105,7 +105,7 @@ impl ControllerParser {
     pub fn new(config: ControllerConfig) -> Self {
         // 1 / 68.96 ?
         let sample_period: f64 = 0.014499999999998181; 
-        let beta: f64 = 0.1;
+        let beta = config.madgwick_beta;
 
         let ahrs_filter = Madgwick::<f64>::new(sample_period, beta); 
         
@@ -124,6 +124,18 @@ impl ControllerParser {
             recorded_mag_data: Arc::new(Mutex::new(Vec::new())),
             recorded_gyro_data: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Updates the configuration of the controller parser and re-initializes components.
+    pub fn update_config(&mut self, new_config: ControllerConfig) {
+        // Re-initialize the AHRS filter with the new beta value
+        let sample_period = self.ahrs_filter.sample_period(); // Keep the last known sample period
+        self.ahrs_filter = Madgwick::<f64>::new(sample_period, new_config.madgwick_beta);
+        
+        // Update the config struct itself
+        self.config = new_config;
+        
+        log::info!("ControllerParser config updated. New beta: {}", self.config.madgwick_beta);
     }
 
     /// Starts recording sensor data to a CSV file.

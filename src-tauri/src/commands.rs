@@ -146,8 +146,10 @@ pub async fn set_controller_config(
         .get_controller_parser();
     let mut controller_parser_guard = controller_parser_arc.lock().await;
 
-    // Update the in-memory config
-    controller_parser_guard.config = config;
+    // Update the config and re-initialize components within the parser
+    controller_parser_guard.update_config(config);
+
+    // Save the new config to disk
     if let Err(e) = controller_parser_guard.config.save_config(&app_handle).await {
         error!("Failed to save controller config: {}", e)
     }
@@ -176,10 +178,16 @@ pub async fn set_mouse_mapper_config(
     let mouse_sender_arc = app_state.mouse_sender.clone();
     let mut mouse_sender_guard = mouse_sender_arc.lock().await;
 
-    mouse_sender_guard.config = config;
+    // Update the config in the sender, which is the primary copy
+    mouse_sender_guard.config = config.clone();
+
+    // Save the updated config to disk
     if let Err(e) = mouse_sender_guard.config.save_config(&app_handle).await {
         error!("Failed to save mouse mapper config: {}", e)
     }
+
+    // Send the updated config to the background thread
+    mouse_sender_guard.update_config(config).await;
 
     Ok(())
 }

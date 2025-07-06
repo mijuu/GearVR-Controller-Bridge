@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::info;
+use log::{info, warn};
 use std::thread;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -9,6 +9,7 @@ use crate::core::controller::ControllerState;
 use crate::mapping::mouse_mapper::{MouseMapper};
 enum MouseMapperCommand {
     Update(ControllerState),
+    UpdateConfig(MouseMapperConfig),
 }
 
 /// A clonable handle that sends commands to the dedicated MouseMapper thread.
@@ -40,6 +41,10 @@ impl MouseMapperSender {
                             // 如果有新数据，就调用 update 来更新【目标位置】
                             mouse_mapper.update(&state);
                             last_update_time = Instant::now();
+                        },
+                        MouseMapperCommand::UpdateConfig(new_config) => {
+                            info!("Updating MouseMapper config");
+                            mouse_mapper.config = new_config;
                         }
                     }
                 }
@@ -61,6 +66,12 @@ impl MouseMapperSender {
     pub async fn update(&self, state: ControllerState) -> Result<()> {
         self.tx.send(MouseMapperCommand::Update(state)).await?;
         Ok(())
+    }
+
+    pub async fn update_config(&self, config: MouseMapperConfig) {
+        if let Err(e) = self.tx.send(MouseMapperCommand::UpdateConfig(config)).await {
+            warn!("Failed to send config update to mouse mapper thread: {}", e);
+        }
     }
 }
 

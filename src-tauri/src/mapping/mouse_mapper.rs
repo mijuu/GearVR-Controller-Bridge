@@ -12,7 +12,7 @@ pub struct MouseMapper {
     /// Enigo instance for input simulation
     enigo: Enigo,
     /// Current configuration
-    config: MouseMapperConfig,
+    pub config: MouseMapperConfig,
     /// Last controller state
     last_state: Option<ControllerState>,
     /// Accumulators for sub-pixel movements

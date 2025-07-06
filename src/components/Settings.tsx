@@ -18,6 +18,7 @@ interface GyroCalibration {
 interface ControllerConfig {
   sensor_low_pass_alpha: number;
   delta_t_smoothing_alpha: number;
+  madgwick_beta: number;
   local_earth_mag_field: number;
   mag_calibration: MagCalibration;
   gyro_calibration: GyroCalibration;
@@ -202,6 +203,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
         const editableControllerFields = [
             { key: 'sensor_low_pass_alpha', label: '传感器低通滤波 (alpha)' },
             { key: 'delta_t_smoothing_alpha', label: '时间步长平滑 (alpha)' },
+            { key: 'madgwick_beta', label: '磁力计信任度 (Madgwick Beta)' },
             { key: 'local_earth_mag_field', label: '本地地磁场强度 (μT)' },
         ];
         return controllerConfig && (
@@ -322,7 +324,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     statusIndicatorFailed: { color: '#dc3545', fontWeight: 'bold' },
     calibrationProgress: { textAlign: 'center', padding: '20px 0' },
     button: { backgroundColor: '#00ffcc', color: '#1e1e1e', border: 'none', padding: '10px 20px', borderRadius: '5px', fontSize: '1rem', cursor: 'pointer', transition: 'background-color 0.3s ease', fontWeight: 'bold' },
-    toastBase: { position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '12px 24px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)', zIndex: 1000, fontSize: '1rem', fontWeight: 500, backdropFilter: 'blur(5px)' },
+    toastBase: { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '12px 24px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)', zIndex: 1000, fontSize: '1rem', fontWeight: 500, backdropFilter: 'blur(5px)' },
     toastSuccess: { backgroundColor: 'rgba(40, 167, 69, 0.85)', color: '#ffffff', border: '1px solid rgba(40, 167, 69, 1)' },
     toastError: { backgroundColor: 'rgba(220, 53, 69, 0.85)', color: '#ffffff', border: '1px solid rgba(220, 53, 69, 1)' },
     formGroup: { marginBottom: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
