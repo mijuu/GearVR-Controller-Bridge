@@ -95,16 +95,14 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           font-weight: 500;
         }
 
-        .log-toggle-link {
-          color: #0275d8;
+        .log-toggle-link, .settings-link {
           cursor: pointer;
           font-size: 0.9rem;
           transition: color 0.2s;
           user-select: none;
         }
 
-        .log-toggle-link:hover {
-          color: #014c8c;
+        .log-toggle-link:hover, .settings-link:hover {
           text-decoration: underline;
         }
       `}</style>

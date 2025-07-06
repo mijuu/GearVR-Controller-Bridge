@@ -228,15 +228,14 @@ impl BluetoothManager {
 
         // Step 2: Magnetometer calibration data collection (movement)
         window.emit("calibration-step", "Take the controller and slowly rotate the controller in a figure-eight pattern for magnetometer calibration.")?;
-        sleep(Duration::from_secs(5)).await;
         self.start_calibration_recording(file_path.as_path()).await?;
         sleep(Duration::from_secs(10)).await; // Duration for figure-eight
 
         window.emit("calibration-step", "Slowly tilt the controller up and down.")?;
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(8)).await;
 
         window.emit("calibration-step", "Slowly rotate the controller horizontally.")?;
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(8)).await;
 
         self.stop_calibration_recording().await?;
         window.emit("calibration-step", "Magnetometer data collection complete. Performing calibration...")?;
