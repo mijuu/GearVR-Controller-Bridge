@@ -100,8 +100,6 @@ pub struct ControllerParser {
     recorded_gyro_data: Arc<Mutex<Vec<Vector3<f64>>>>,
 }
 
-
-
 impl ControllerParser {
     /// Creates a new controller parser
     pub fn new(config: ControllerConfig) -> Self {
@@ -391,8 +389,11 @@ impl ControllerParser {
         *sample_period_ref = self.smoothed_delta_t;
 
         // 检查磁力计数据是否在有效范围内
+        let mag_norm_max_threshold = self.config.local_earth_mag_field * 1.2; // 20% margin
+        let mag_norm_min_threshold = self.config.local_earth_mag_field * 0.8; // 20% margin
+
         let mag_norm = calibrated_mag.norm(); // 使用校准后的磁力计数据进行范数检查
-        let update_result = if mag_norm > self.config.mag_norm_min_threshold && mag_norm < self.config.mag_norm_max_threshold {
+        let update_result = if mag_norm > mag_norm_min_threshold && mag_norm < mag_norm_max_threshold {
             // eprintln!("Magnetometer data in range (norm: {}), using full AHRS update.", mag_norm);
             self.ahrs_filter.update(&current_gyro_filtered, &nalgebra_accel, &calibrated_mag) // 使用校准后的磁力计数据
         } else {

@@ -8,8 +8,6 @@ interface ControllerConfig {
   sensor_low_pass_alpha: number;
   delta_t_smoothing_alpha: number;
   local_earth_mag_field: number;
-  mag_norm_max_threshold: number;
-  mag_norm_min_threshold: number;
   // mag_calibration and gyro_calibration are handled separately
 }
 
@@ -188,14 +186,6 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
           <div style={styles.formGroup}>
             <label>本地地磁场强度 (μT)</label>
             <input type="number" step="0.1" value={controllerConfig.local_earth_mag_field} onChange={(e) => handleControllerChange('local_earth_mag_field', e.target.value)} style={styles.input} />
-          </div>
-          <div style={styles.formGroup}>
-            <label>磁力计模长上限 (μT)</label>
-            <input type="number" step="0.1" value={controllerConfig.mag_norm_max_threshold} onChange={(e) => handleControllerChange('mag_norm_max_threshold', e.target.value)} style={styles.input} />
-          </div>
-          <div style={styles.formGroup}>
-            <label>磁力计模长下限 (μT)</label>
-            <input type="number" step="0.1" value={controllerConfig.mag_norm_min_threshold} onChange={(e) => handleControllerChange('mag_norm_min_threshold', e.target.value)} style={styles.input} />
           </div>
         </div>
       )}

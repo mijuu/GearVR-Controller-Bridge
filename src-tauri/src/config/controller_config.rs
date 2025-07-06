@@ -38,12 +38,9 @@ pub struct ControllerConfig {
     /// 控制时间步长的稳定性。值越小平滑越强，但可能引入更多延迟。
     pub delta_t_smoothing_alpha: f64,
 
+    /// 地区地磁强度 (uT)
     pub local_earth_mag_field: f64,
 
-    /// 磁力计有效性的最大模长阈值 (μT)。
-    pub mag_norm_max_threshold: f64,
-    /// 磁力计有效性的最小模长阈值 (μT)。
-    pub mag_norm_min_threshold: f64,
 
     /// 磁力计校准参数
     pub mag_calibration: MagCalibration,
@@ -59,8 +56,6 @@ impl Default for ControllerConfig {
             sensor_low_pass_alpha: 1.0,
             delta_t_smoothing_alpha: 1.0,
             local_earth_mag_field,
-            mag_norm_max_threshold: 1.2 * local_earth_mag_field,
-            mag_norm_min_threshold: 0.8 * local_earth_mag_field, 
             mag_calibration: MagCalibration::default(),
             gyro_calibration: GyroCalibration::default(),
         }
