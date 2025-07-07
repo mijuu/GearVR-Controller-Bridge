@@ -19,6 +19,7 @@ interface ControllerConfig {
   sensor_low_pass_alpha: number;
   delta_t_smoothing_alpha: number;
   madgwick_beta: number;
+  orientation_smoothing_factor: number;
   local_earth_mag_field: number;
   mag_calibration: MagCalibration;
   gyro_calibration: GyroCalibration;
@@ -204,6 +205,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
             { key: 'sensor_low_pass_alpha', label: '传感器低通滤波 (alpha)' },
             { key: 'delta_t_smoothing_alpha', label: '时间步长平滑 (alpha)' },
             { key: 'madgwick_beta', label: '磁力计信任度 (Madgwick Beta)' },
+            { key: 'orientation_smoothing_factor', label: '姿态平滑因子' },
             { key: 'local_earth_mag_field', label: '本地地磁场强度 (μT)' },
         ];
         return controllerConfig && (

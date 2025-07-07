@@ -42,6 +42,10 @@ pub struct ControllerConfig {
     /// 控制对磁力计数据的信任程度。值越大，对磁力计的依赖越高，姿态收敛越快，但更容易受磁场干扰。
     pub madgwick_beta: f64,
 
+    /// 最终姿态 (orientation) 平滑的因子。
+    /// 控制姿态的平滑程度。值越小平滑越强，延迟越大；值越大延迟越小，但可能抖动。
+    pub orientation_smoothing_factor: f64,
+
     /// 地区地磁强度 (uT)
     pub local_earth_mag_field: f64,
 
@@ -60,6 +64,7 @@ impl Default for ControllerConfig {
             sensor_low_pass_alpha: 0.8,
             delta_t_smoothing_alpha: 1.0,
             madgwick_beta: 0.08,
+            orientation_smoothing_factor: 0.8, // Default smoothing factor
             local_earth_mag_field,
             mag_calibration: MagCalibration::default(),
             gyro_calibration: GyroCalibration::default(),

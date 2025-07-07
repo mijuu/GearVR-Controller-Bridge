@@ -98,6 +98,8 @@ pub struct ControllerParser {
     recorded_mag_data: Arc<Mutex<Vec<Vector3<f64>>>>,
     /// Recorded gyroscope data for calibration
     recorded_gyro_data: Arc<Mutex<Vec<Vector3<f64>>>>,
+    /// Smoothed orientation for reducing jitter.
+    smoothed_orientation: UnitQuaternion<f64>,
 }
 
 impl ControllerParser {
@@ -123,6 +125,7 @@ impl ControllerParser {
             data_record_sender: None,
             recorded_mag_data: Arc::new(Mutex::new(Vec::new())),
             recorded_gyro_data: Arc::new(Mutex::new(Vec::new())),
+            smoothed_orientation: UnitQuaternion::identity(),
         }
     }
 
@@ -452,6 +455,9 @@ impl ControllerParser {
             final_display_orientation = zero_q * final_display_orientation;
         }
 
+        // Apply smoothing to the final display orientation
+        self.smoothed_orientation = self.smoothed_orientation.slerp(&final_display_orientation, self.config.orientation_smoothing_factor);
+
         let state = ControllerState {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -459,7 +465,7 @@ impl ControllerParser {
                 .as_millis() as u64,
             buttons,
             touchpad,
-            orientation: final_display_orientation,
+            orientation: self.smoothed_orientation,
             accelerometer: current_accel_filtered,
             gyroscope: current_gyro_filtered,
             magnetometer: current_mag_filtered,
