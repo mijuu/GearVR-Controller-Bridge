@@ -57,9 +57,9 @@ impl Default for ControllerConfig {
     fn default() -> Self {
         let local_earth_mag_field = 49.5; // Shanghai ~49.5uT
         ControllerConfig {
-            sensor_low_pass_alpha: 1.0,
+            sensor_low_pass_alpha: 0.8,
             delta_t_smoothing_alpha: 1.0,
-            madgwick_beta: 0.1,
+            madgwick_beta: 0.08,
             local_earth_mag_field,
             mag_calibration: MagCalibration::default(),
             gyro_calibration: GyroCalibration::default(),

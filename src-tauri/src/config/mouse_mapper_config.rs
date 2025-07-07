@@ -53,8 +53,6 @@ pub struct MouseMapperConfig {
     pub mode: MouseMode,
     /// Button mappings
     pub button_mapping: ButtonMapping,
-    /// Mouse sensitivity for air mouse mode
-    pub air_mouse_sensitivity: f32,
     /// Mouse sensitivity for touchpad mode
     pub touchpad_sensitivity: f32,
     /// Acceleration factor for touchpad mode. 0.0 means no acceleration.
@@ -73,7 +71,6 @@ impl Default for MouseMapperConfig {
         MouseMapperConfig {
             mode: MouseMode::Touchpad,
             button_mapping: ButtonMapping::default(),
-            air_mouse_sensitivity: 10.0,
             touchpad_sensitivity: 500.0,
             touchpad_acceleration: 1.2,
             touchpad_acceleration_threshold: 0.0002,

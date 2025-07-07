@@ -242,11 +242,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                     </label>
                 </div>
               </div>
-    
-              <div style={styles.formGroup}>
-                <label>空中鼠标灵敏度</label>
-                <input type="number" step="0.1" value={mouseMapperConfig.air_mouse_sensitivity} onBlur={(e) => handleConfigChange('mouse', 'air_mouse_sensitivity', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_sensitivity: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
+
               <div style={styles.formGroup}>
                 <label>触摸板灵敏度</label>
                 <input type="number" step="1" value={mouseMapperConfig.touchpad_sensitivity} onBlur={(e) => handleConfigChange('mouse', 'touchpad_sensitivity', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, touchpad_sensitivity: parseFloat(e.target.value)})} style={styles.input} />
@@ -260,7 +256,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                 <input type="number" step="0.0001" value={mouseMapperConfig.touchpad_acceleration_threshold} onBlur={(e) => handleConfigChange('mouse', 'touchpad_acceleration_threshold', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration_threshold: parseFloat(e.target.value)})} style={styles.input} />
               </div>
               <div style={styles.formGroup}>
-                <label>空中鼠标FOV</label>
+                <label>空中鼠标灵敏度 (FOV)</label>
                 <input type="number" step="1" value={mouseMapperConfig.air_mouse_fov} onBlur={(e) => handleConfigChange('mouse', 'air_mouse_fov', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_fov: parseFloat(e.target.value)})} style={styles.input} />
               </div>
               <div style={styles.formGroup}>

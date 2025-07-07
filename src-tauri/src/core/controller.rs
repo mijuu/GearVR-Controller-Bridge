@@ -372,7 +372,7 @@ impl ControllerParser {
         let current_sensor_time_seconds = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as f64 / 1_000_000.0;
 
         // --- 计算 delta_t ---
-        let delta_t: f64;
+        let mut delta_t: f64;
         if let Some(prev_time) = self.last_sensor_time {
             delta_t = current_sensor_time_seconds - prev_time;
 
@@ -381,6 +381,7 @@ impl ControllerParser {
                 // 时间戳没有前进，或者发生了回绕，这会导致 AHRS 异常
                 // 打印警告或使用一个默认的 delta_t，例如 initial_sample_period
                 eprintln!("Warning: Non-positive delta_t: {}. Using default sample_period.", delta_t);
+                delta_t = self.ahrs_filter.sample_period();
             }
         } else {
             // 第一次解析数据，无法计算 delta_t。
