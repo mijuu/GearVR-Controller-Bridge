@@ -2,6 +2,8 @@
 
 use bluest::{Device, Characteristic};
 
+use crate::mapping::mouse::MouseMapperSender;
+
 /// Represents a discovered Bluetooth device
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct BluetoothDevice {
@@ -42,6 +44,8 @@ impl BluetoothDevice {
 pub struct ConnectedDeviceState {
     /// The device handle, used for things like checking connection status or disconnecting.
     pub device: Device,
+    /// The sender handle for sending mouse events to the device.
+    pub mouse_sender: MouseMapperSender,
     /// The characteristic handle for receiving notifications from the device.
     pub notify_characteristic: Characteristic,
     /// The characteristic handle for writing commands to the device.

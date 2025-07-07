@@ -69,7 +69,7 @@ impl ConnectionManager {
     }
 
     /// Try to connect to the controller
-    async fn try_connect(
+    pub async fn try_connect(
         &self,
         device: &Device,
         window: &Window,

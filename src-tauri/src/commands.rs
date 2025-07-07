@@ -69,7 +69,7 @@ pub async fn get_battery_level(
     app_state: State<'_, AppState>,
 ) -> Result<u8, String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
-    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
     bluetooth_manager_guard.get_battery_level(window)
         .await
@@ -87,6 +87,17 @@ pub async fn disconnect(app_state: State<'_, AppState>) -> Result<(), String> {
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
     bluetooth_manager_guard.disconnect().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reconnect_to_device(
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    
+    bluetooth_manager_guard.reconnect_device(window).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -199,6 +210,7 @@ macro_rules! export_commands {
             $crate::commands::start_scan,
             $crate::commands::stop_scan,
             $crate::commands::connect_to_device,
+            $crate::commands::reconnect_to_device,
             $crate::commands::get_battery_level,
             $crate::commands::disconnect,
             $crate::commands::turn_off_controller,

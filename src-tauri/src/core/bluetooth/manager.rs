@@ -12,7 +12,7 @@ use log::{info, error};
 use tokio::sync::{Mutex};
 use tauri::{Emitter, Manager, Window};
 
-use crate::mapping::mouse::MouseMapperSender;
+use crate::mapping::mouse::{MouseMapperSender};
 use crate::core::bluetooth::commands::CommandExecutor;
 use crate::core::bluetooth::connection::{ConnectionManager, BluestCommandSender};
 use crate::core::bluetooth::types::{ConnectedDeviceState};
@@ -34,7 +34,7 @@ use crate::utils::ensure_directory_exists;
 /// Manages Bluetooth operations
 pub struct BluetoothManager {
     /// The Bluetooth adapter
-    // adapter: Adapter,
+    adapter: Adapter,
     /// Map of device addresses to devices
     devices: Arc<Mutex<HashMap<String, Device>>>,
     /// Currently connected device
@@ -62,7 +62,7 @@ impl BluetoothManager {
         let notification_handler = NotificationHandler::new(controller_parser.clone());
 
         Ok(Self {
-            // adapter,
+            adapter,
             devices,
             connected_state: Arc::new(Mutex::new(None)),
             connection_manager,
@@ -106,7 +106,7 @@ impl BluetoothManager {
             &device,
             &window,
             &mut self.notification_handler,
-            mouse_sender,
+            mouse_sender.clone(),
             UUID_CONTROLLER_SERVICE,
             UUID_CONTROLLER_NOTIFY_CHAR,
             UUID_CONTROLLER_WRITE_CHAR,
@@ -114,6 +114,7 @@ impl BluetoothManager {
         
         let state = ConnectedDeviceState {
             device: device.clone(),
+            mouse_sender,
             notify_characteristic: notify_char,
             write_characteristic: write_char,
         };
@@ -121,6 +122,42 @@ impl BluetoothManager {
         *self.connected_state.lock().await = Some(state);
 
         info!("Device successfully connected and state stored in the main service.");
+        Ok(())
+    }
+
+    /// Reconnects to the last connected device
+    pub async fn reconnect_device(&mut self, window: Window) -> Result<()> {
+        let connected_state = {
+            let connected_state_guard = self.connected_state.lock().await;
+            connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
+        };
+        let last_device_id = connected_state.device.id();
+        let mouse_sender = connected_state.mouse_sender;
+
+        info!("Attempting to reconnect to device {}", &last_device_id);
+        let device = self.adapter.open_device(&last_device_id).await?;
+        
+        // Connect to the device with retry mechanism
+        let (notify_char, write_char) = self.connection_manager.try_connect(
+            &device,
+            &window,
+            &mut self.notification_handler,
+            mouse_sender.clone(),
+            UUID_CONTROLLER_SERVICE,
+            UUID_CONTROLLER_NOTIFY_CHAR,
+            UUID_CONTROLLER_WRITE_CHAR,
+        ).await?;
+        
+        let state = ConnectedDeviceState {
+            device: device.clone(),
+            mouse_sender,
+            notify_characteristic: notify_char,
+            write_characteristic: write_char,
+        };
+        // If connection successful, store the connected device
+        *self.connected_state.lock().await = Some(state);
+
+        info!("Device successfully reconnected and state stored in the main service.");
         Ok(())
     }
 
@@ -167,7 +204,7 @@ impl BluetoothManager {
     }
 
     /// Get battery level
-    pub async fn get_battery_level(&self, window: Window) -> Result<Option<u8>> {
+    pub async fn get_battery_level(&mut self, window: Window) -> Result<Option<u8>> {
         let connected_state = {
             let connected_state_guard = self.connected_state.lock().await;
             connected_state_guard.clone().ok_or_else(|| anyhow!("No device connected"))?
@@ -177,6 +214,8 @@ impl BluetoothManager {
         if !device.is_connected().await {
             info!("Device {:?} is not connected. Skipping battery level retrieval.", device.id());
             
+            let window_clone = window.clone();
+            self.reconnect_device(window_clone).await.unwrap();
             if let Err(e) = window.emit("device-lost-connection", ()) {
                 error!("Failed to emit device-lost-connection event: {}", e);
             }
