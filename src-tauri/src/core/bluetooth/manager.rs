@@ -102,14 +102,16 @@ impl BluetoothManager {
         }
         
         // Connect to the device with retry mechanism
-        let (notify_char, write_char) = self.connection_manager.connect_with_retry(
+        let (notify_char, write_char, battery_char) = self.connection_manager.connect_with_retry(
             &device,
             &window,
             &mut self.notification_handler,
             mouse_sender.clone(),
             UUID_CONTROLLER_SERVICE,
+            UUID_BATTERY_SERVICE,
             UUID_CONTROLLER_NOTIFY_CHAR,
             UUID_CONTROLLER_WRITE_CHAR,
+            UUID_BATTERY_LEVEL
         ).await?;
         
         let state = ConnectedDeviceState {
@@ -117,6 +119,7 @@ impl BluetoothManager {
             mouse_sender,
             notify_characteristic: notify_char,
             write_characteristic: write_char,
+            battery_characteristic: battery_char,
         };
         // If connection successful, store the connected device
         *self.connected_state.lock().await = Some(state);
@@ -138,14 +141,16 @@ impl BluetoothManager {
         let device = self.adapter.open_device(&last_device_id).await?;
         
         // Connect to the device with retry mechanism
-        let (notify_char, write_char) = self.connection_manager.try_connect(
+        let (notify_char, write_char, battery_char) = self.connection_manager.try_connect(
             &device,
             &window,
             &mut self.notification_handler,
             mouse_sender.clone(),
             UUID_CONTROLLER_SERVICE,
+            UUID_BATTERY_SERVICE,
             UUID_CONTROLLER_NOTIFY_CHAR,
             UUID_CONTROLLER_WRITE_CHAR,
+            UUID_BATTERY_LEVEL
         ).await?;
         
         let state = ConnectedDeviceState {
@@ -153,6 +158,7 @@ impl BluetoothManager {
             mouse_sender,
             notify_characteristic: notify_char,
             write_characteristic: write_char,
+            battery_characteristic: battery_char,
         };
         // If connection successful, store the connected device
         *self.connected_state.lock().await = Some(state);
@@ -222,22 +228,8 @@ impl BluetoothManager {
             return Ok(None); // Return None if not connected
         }
 
-        // Find battery service and characteristic
-        let service = device
-            .discover_services_with_uuid(UUID_BATTERY_SERVICE).await?;
-
-        let battery_service = service
-            .first()
-            .ok_or_else(|| anyhow!("Battery service not found"))?;
-        
-        let characteristics = battery_service.characteristics().await?;
-        let battery_char = characteristics
-            .iter()
-            .find(|c| c.uuid() == UUID_BATTERY_LEVEL)
-            .ok_or_else(|| anyhow!("Battery level characteristic not found"))?;
-        
         // Read battery level
-        let battery_data = battery_char.read().await?;
+        let battery_data = connected_state.battery_characteristic.read().await?;
         
         if battery_data.is_empty() {
             return Err(anyhow!("No battery level data received"));

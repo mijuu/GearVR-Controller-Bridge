@@ -32,9 +32,11 @@ impl ConnectionManager {
         notification_handler: &mut NotificationHandler,
         mouse_sender: MouseMapperSender,
         controller_service_uuid: Uuid,
+        battery_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
-    ) -> Result<(Characteristic, Characteristic)> {
+        battery_char_uuid: Uuid,
+    ) -> Result<(Characteristic, Characteristic, Characteristic)> {
         let mut retry_count = 0;
         let mut last_error = None;
 
@@ -45,12 +47,14 @@ impl ConnectionManager {
                 notification_handler,
                 mouse_sender.clone(),
                 controller_service_uuid,
+                battery_service_uuid,
                 notify_char_uuid,
                 write_char_uuid,
+                battery_char_uuid,
             ).await {
-                Ok((notify_char, write_char)) => {
+                Ok((notify_char, write_char, battery_char)) => {
                     info!("Successfully connected to device");
-                    return Ok((notify_char, write_char));
+                    return Ok((notify_char, write_char, battery_char));
                 }
                 Err(e) => {
                     warn!("Connection attempt {} failed: {}", retry_count + 1, e);
@@ -76,9 +80,11 @@ impl ConnectionManager {
         notification_handler: &mut NotificationHandler,
         mouse_sender: MouseMapperSender,
         controller_service_uuid: Uuid,
+        battery_service_uuid: Uuid,
         notify_char_uuid: Uuid,
         write_char_uuid: Uuid,
-    ) -> Result<(Characteristic, Characteristic)> {
+        battery_char_uuid: Uuid
+    ) -> Result<(Characteristic, Characteristic, Characteristic)> {
         let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
         let id = device.id().to_string();
         info!("Connecting to device - ID: {}, Name: {:?}", id, name);
@@ -93,18 +99,25 @@ impl ConnectionManager {
         }
         
         info!("Discovering services...");
-        let services = device.services().await?;
-        let controller_service = services
-            .iter()
-            .find(|s| s.uuid() == controller_service_uuid)
-            .ok_or_else(|| {
-                for service in &services {
-                    info!("Available service: {}", service.uuid());
-                }
-                anyhow!("Controller service not found: {}", controller_service_uuid)
-            })?.clone();
-
+        let controller_service = match device
+            .discover_services_with_uuid(controller_service_uuid)
+            .await?
+            .first()
+            {
+                Some(service) => service.clone(),
+                None => return Err(anyhow!("Controller service not found: {}", controller_service_uuid)),
+            };
         info!("Found controller service: {}", controller_service.uuid());
+        
+        let battery_service = match device
+            .discover_services_with_uuid(battery_service_uuid)
+            .await?
+            .first()
+            {
+                Some(service) => service.clone(),
+                None => return Err(anyhow!("Battery service not found: {}", battery_service_uuid)),
+            };
+        info!("Found battery service: {}", battery_service.uuid());
 
         let mut notify_char_opt = None;
         let mut write_char_opt = None;
@@ -119,9 +132,20 @@ impl ConnectionManager {
                 write_char_opt = Some(char.clone());
             }
         }
-
         let notify_char = notify_char_opt.ok_or_else(|| anyhow!("Notification characteristic not found: {}", notify_char_uuid))?;
         let write_char = write_char_opt.ok_or_else(|| anyhow!("Write characteristic not found: {}", write_char_uuid))?;
+
+        let battery_char = match battery_service
+            .discover_characteristics_with_uuid(battery_char_uuid)
+            .await?
+            .first()
+            {
+                Some(char) => {
+                    info!("Found battery characteristic: {}", battery_char_uuid);
+                    char.clone()
+                },
+                None => return Err(anyhow!("Battery characteristic not found: {}", battery_char_uuid)),
+            };
 
         // 创建新的 CommandSender
         let command_sender = BluestCommandSender::new(write_char.clone());
@@ -152,7 +176,7 @@ impl ConnectionManager {
         if let Err(e) = window.emit("device-connected", payload) {
             error!("Failed to emit device-connected event: {}", e);
         }
-        Ok((notify_char, write_char))
+        Ok((notify_char, write_char, battery_char))
     }
 
     /// Disconnect from the controller (bluest version)

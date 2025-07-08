@@ -50,4 +50,6 @@ pub struct ConnectedDeviceState {
     pub notify_characteristic: Characteristic,
     /// The characteristic handle for writing commands to the device.
     pub write_characteristic: Characteristic,
+    /// The characteristic handle for reading the battery level from the device.
+    pub battery_characteristic: Characteristic,
 }
