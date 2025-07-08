@@ -203,6 +203,58 @@ pub async fn set_mouse_mapper_config(
     Ok(())
 }
 
+/// Resets the controller configuration to its default values.
+#[tauri::command]
+pub async fn reset_controller_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+) -> Result<ControllerConfig, String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    let controller_parser_arc = bluetooth_manager_guard
+        .notification_handler
+        .get_controller_parser();
+    let mut controller_parser_guard = controller_parser_arc.lock().await;
+
+    // Reset to default config
+    let new_config = ControllerConfig::default();
+    controller_parser_guard.update_config(new_config.clone());
+
+    // Save the new config to disk
+    if let Err(e) = controller_parser_guard.config.save_config(&app_handle).await {
+        error!("Failed to save controller config after reset: {}", e);
+    }
+
+    Ok(new_config)
+}
+
+/// Resets the mouse mapper configuration to its default values, preserving button mappings.
+#[tauri::command]
+pub async fn reset_mouse_mapper_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+) -> Result<MouseMapperConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    // Create a default config but preserve the existing button mapping
+    let mut new_config = MouseMapperConfig::default();
+    new_config.button_mapping = mouse_sender_guard.config.button_mapping.clone();
+
+    // Update the config in the sender
+    mouse_sender_guard.config = new_config.clone();
+
+    // Save the updated config to disk
+    if let Err(e) = mouse_sender_guard.config.save_config(&app_handle).await {
+        error!("Failed to save mouse mapper config after reset: {}", e);
+    }
+
+    // Send the updated config to the background thread
+    mouse_sender_guard.update_config(new_config.clone()).await;
+
+    Ok(new_config)
+}
+
 #[macro_export]
 macro_rules! export_commands {
     () => {
@@ -218,8 +270,10 @@ macro_rules! export_commands {
             $crate::commands::start_gyro_calibration,
             $crate::commands::get_controller_config,
             $crate::commands::set_controller_config,
+            $crate::commands::reset_controller_config,
             $crate::commands::get_mouse_mapper_config,
             $crate::commands::set_mouse_mapper_config,
+            $crate::commands::reset_mouse_mapper_config
         ]
     };
 }

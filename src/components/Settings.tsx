@@ -44,6 +44,67 @@ type ActiveMenu = 'calibration' | 'controller' | 'mouse';
 type CalibrationStatus = 'idle' | 'calibrating' | 'success' | 'failed';
 type ToastType = 'success' | 'error';
 
+// --- Reusable UI Components ---
+
+const Slider: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  onAfterChange: () => void;
+  precision?: number;
+}> = ({ label, value, min, max, step, onChange, onAfterChange, precision = 4 }) => (
+    <div style={styles.formGroup}>
+        <label style={styles.sliderLabel}>
+            {label}: <span style={styles.sliderValue}>{value.toFixed(precision)}</span>
+        </label>
+        <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(parseFloat(e.target.value))}
+            onMouseUp={onAfterChange}
+            onTouchEnd={onAfterChange}
+            style={styles.slider}
+        />
+    </div>
+);
+
+const Switch: React.FC<{
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  onLabel?: string;
+  offLabel?: string;
+}> = ({ label, checked, onChange, }) => {
+    const switchSliderStyle: React.CSSProperties = {
+        ...styles.switchSlider,
+        backgroundColor: checked ? '#00cc99' : '#555',
+    };
+
+    const switchKnobStyle: React.CSSProperties = {
+        ...styles.switchKnob,
+        transform: checked ? 'translateX(26px)' : 'translateX(0px)',
+    };
+
+    return (
+        <div style={styles.formGroupRow}>
+            <label style={styles.switchLabel}>{label}</label>
+            <div style={styles.switchContainer} onClick={() => onChange(!checked)}>
+                <div style={styles.switch}>
+                    <div style={switchSliderStyle} />
+                    <div style={switchKnobStyle} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 // --- Sub-components ---
 
 const CalibrationCard: React.FC<any> = ({ title, description, status, calibrationStep, onStart }) => {
@@ -188,12 +249,36 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
         });
   };
 
+  const handleResetControllerConfig = async () => {
+    try {
+      const config = await invoke<ControllerConfig>('reset_controller_config');
+      setControllerConfig(config);
+      showToast('控制器设置已重置为默认值', 'success');
+    } catch (err) {
+      showToast('重置失败', 'error');
+      console.error('Failed to reset controller config:', err);
+    }
+  };
+
+  const handleResetMouseMapperConfig = async () => {
+    try {
+      const config = await invoke<MouseMapperConfig>('reset_mouse_mapper_config');
+      setMouseMapperConfig(config);
+      showToast('鼠标设置已重置为默认值 (不含按键映射)', 'success');
+    } catch (err) {
+      showToast('重置失败', 'error');
+      console.error('Failed to reset mouse mapper config:', err);
+    }
+  };
+
   const renderContent = () => {
     switch (activeMenu) {
       case 'calibration':
         return (
           <div style={styles.section}>
-            <h3 style={styles.subHeading}>传感器校准</h3>
+            <div style={styles.subHeadingContainer}>
+                <h3 style={styles.subHeading}>传感器校准</h3>
+            </div>
             <div style={styles.cardsContainer}>
                 <CalibrationCard title="磁力计校准" description="用于修正方向漂移，提高指向精度。" status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? calibrationStep : undefined} onStart={handleStartMagCalibration} />
                 <CalibrationCard title="陀螺仪校准" description="用于修正旋转过程中的抖动和偏移。" status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? '校准中，请保持设备静止...' : undefined} onStart={handleStartGyroCalibration} />
@@ -201,22 +286,47 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
           </div>
         );
       case 'controller':
-        const editableControllerFields = [
-            { key: 'sensor_low_pass_alpha', label: '传感器低通滤波 (alpha)' },
-            { key: 'delta_t_smoothing_alpha', label: '时间步长平滑 (alpha)' },
-            { key: 'madgwick_beta', label: '磁力计信任度 (Madgwick Beta)' },
-            { key: 'orientation_smoothing_factor', label: '姿态平滑因子' },
-            { key: 'local_earth_mag_field', label: '本地地磁场强度 (μT)' },
-        ];
         return controllerConfig && (
             <div style={styles.section}>
-              <h3 style={styles.subHeading}>控制器设置</h3>
-              {editableControllerFields.map(({ key, label }) => (
-                <div style={styles.formGroup} key={key}>
-                  <label>{label}</label>
-                  <input type="number" step="0.01" value={(controllerConfig as any)[key]} onBlur={(e) => handleConfigChange('controller', key, e.target.value)} onChange={(e) => setControllerConfig({ ...controllerConfig, [key]: parseFloat(e.target.value) || 0 })} style={styles.input} />
+                <div style={styles.subHeadingContainer}>
+                    <h3 style={styles.subHeading}>控制器设置</h3>
+                    <button onClick={handleResetControllerConfig} style={styles.resetButton}>重置</button>
                 </div>
-              ))}
+                <Slider
+                    label="传感器低通滤波 (alpha)"
+                    min={0} max={1} step={0.01} value={controllerConfig.sensor_low_pass_alpha}
+                    onChange={(v) => setControllerConfig({ ...controllerConfig, sensor_low_pass_alpha: v })}
+                    onAfterChange={() => handleConfigChange('controller', 'sensor_low_pass_alpha', controllerConfig.sensor_low_pass_alpha)}
+                    precision={2}
+                />
+                <Slider
+                    label="时间步长平滑 (alpha)"
+                    min={0} max={1} step={0.01} value={controllerConfig.delta_t_smoothing_alpha}
+                    onChange={(v) => setControllerConfig({ ...controllerConfig, delta_t_smoothing_alpha: v })}
+                    onAfterChange={() => handleConfigChange('controller', 'delta_t_smoothing_alpha', controllerConfig.delta_t_smoothing_alpha)}
+                    precision={2}
+                />
+                <Slider
+                    label="磁力计信任度 (Beta)"
+                    min={0} max={1} step={0.01} value={controllerConfig.madgwick_beta}
+                    onChange={(v) => setControllerConfig({ ...controllerConfig, madgwick_beta: v })}
+                    onAfterChange={() => handleConfigChange('controller', 'madgwick_beta', controllerConfig.madgwick_beta)}
+                    precision={2}
+                />
+                <Slider
+                    label="姿态平滑因子"
+                    min={0} max={1} step={0.01} value={controllerConfig.orientation_smoothing_factor}
+                    onChange={(v) => setControllerConfig({ ...controllerConfig, orientation_smoothing_factor: v })}
+                    onAfterChange={() => handleConfigChange('controller', 'orientation_smoothing_factor', controllerConfig.orientation_smoothing_factor)}
+                    precision={2}
+                />
+                <Slider
+                    label="本地地磁场强度 (μT)"
+                    min={20} max={70} step={1} value={controllerConfig.local_earth_mag_field}
+                    onChange={(v) => setControllerConfig({ ...controllerConfig, local_earth_mag_field: v })}
+                    onAfterChange={() => handleConfigChange('controller', 'local_earth_mag_field', controllerConfig.local_earth_mag_field)}
+                    precision={0}
+                />
               <h4 style={styles.subHeading4}>陀螺仪校准数据 (只读)</h4>
               <VectorDisplay vector={controllerConfig.gyro_calibration.zero_bias} />
 
@@ -230,41 +340,50 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
       case 'mouse':
         return mouseMapperConfig && (
             <div style={styles.section}>
-              <h3 style={styles.subHeading}>鼠标映射设置</h3>
-              <div style={styles.formGroup}>
-                <label>鼠标模式</label>
-                <div style={styles.radioGroup}>
-                    <label>
-                    <input type="radio" value="AirMouse" checked={mouseMapperConfig.mode === 'AirMouse'} onChange={() => handleConfigChange('mouse', 'mode', 'AirMouse')} />
-                    空中鼠标
-                    </label>
-                    <label>
-                    <input type="radio" value="Touchpad" checked={mouseMapperConfig.mode === 'Touchpad'} onChange={() => handleConfigChange('mouse', 'mode', 'Touchpad')} />
-                    触摸板
-                    </label>
+                <div style={styles.subHeadingContainer}>
+                    <h3 style={styles.subHeading}>鼠标映射设置</h3>
+                    <button onClick={handleResetMouseMapperConfig} style={styles.resetButton}>重置</button>
                 </div>
-              </div>
-
-              <div style={styles.formGroup}>
-                <label>触摸板灵敏度</label>
-                <input type="number" step="1" value={mouseMapperConfig.touchpad_sensitivity} onBlur={(e) => handleConfigChange('mouse', 'touchpad_sensitivity', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, touchpad_sensitivity: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
-              <div style={styles.formGroup}>
-                <label>触摸板加速度</label>
-                <input type="number" step="0.1" value={mouseMapperConfig.touchpad_acceleration} onBlur={(e) => handleConfigChange('mouse', 'touchpad_acceleration', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
-              <div style={styles.formGroup}>
-                <label>触摸板加速度阈值</label>
-                <input type="number" step="0.0001" value={mouseMapperConfig.touchpad_acceleration_threshold} onBlur={(e) => handleConfigChange('mouse', 'touchpad_acceleration_threshold', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration_threshold: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
-              <div style={styles.formGroup}>
-                <label>空中鼠标灵敏度 (FOV)</label>
-                <input type="number" step="1" value={mouseMapperConfig.air_mouse_fov} onBlur={(e) => handleConfigChange('mouse', 'air_mouse_fov', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_fov: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
-              <div style={styles.formGroup}>
-                <label>空中鼠标激活阈值</label>
-                <input type="number" step="0.5" value={mouseMapperConfig.air_mouse_activation_threshold} onBlur={(e) => handleConfigChange('mouse', 'air_mouse_activation_threshold', parseFloat(e.target.value))} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_activation_threshold: parseFloat(e.target.value)})} style={styles.input} />
-              </div>
+                <Switch
+                    label="启用AirMouse (双击Home快捷开启)"
+                    checked={mouseMapperConfig.mode === 'AirMouse'}
+                    onChange={(isChecked) => handleConfigChange('mouse', 'mode', isChecked ? 'AirMouse' : 'Touchpad')}
+                />
+                <Slider
+                    label="触摸板灵敏度"
+                    min={1} max={1000} step={1} value={mouseMapperConfig.touchpad_sensitivity}
+                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_sensitivity: v})}
+                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_sensitivity', mouseMapperConfig.touchpad_sensitivity)}
+                    precision={0}
+                />
+                <Slider
+                    label="触摸板加速度"
+                    min={0} max={10} step={0.1} value={mouseMapperConfig.touchpad_acceleration}
+                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration: v})}
+                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_acceleration', mouseMapperConfig.touchpad_acceleration)}
+                    precision={1}
+                />
+                <Slider
+                    label="触摸板加速度阈值"
+                    min={0} max={0.01} step={0.0001} value={mouseMapperConfig.touchpad_acceleration_threshold}
+                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration_threshold: v})}
+                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_acceleration_threshold', mouseMapperConfig.touchpad_acceleration_threshold)}
+                    precision={4}
+                />
+                <Slider
+                    label="空中鼠标灵敏度 (FOV)"
+                    min={10} max={180} step={1} value={mouseMapperConfig.air_mouse_fov}
+                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_fov: v})}
+                    onAfterChange={() => handleConfigChange('mouse', 'air_mouse_fov', mouseMapperConfig.air_mouse_fov)}
+                    precision={0}
+                />
+                <Slider
+                    label="空中鼠标激活阈值"
+                    min={0} max={20} step={0.5} value={mouseMapperConfig.air_mouse_activation_threshold}
+                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_activation_threshold: v})}
+                    onAfterChange={() => handleConfigChange('mouse', 'air_mouse_activation_threshold', mouseMapperConfig.air_mouse_activation_threshold)}
+                    precision={1}
+                />
     
               <h4 style={styles.subHeading4}>按键映射</h4>
               {Object.entries(mouseMapperConfig.button_mapping).map(([key, value]) => (
@@ -300,15 +419,17 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
 };
 
 const styles: { [key: string]: React.CSSProperties } = {
-    page: { height: '100%', display: 'flex', backgroundColor: '#1e1e1e', color: '#ffffff', padding: '20px', boxSizing: 'border-box' },
+    page: { height: '100%', display: 'flex', backgroundColor: '#1e1e1e', color: '#ffffff', boxSizing: 'border-box' },
     container: { display: 'flex', flex: 1, overflow: 'hidden' },
-    leftMenu: { display: 'flex', flexDirection: 'column', paddingRight: '20px', borderRight: '1px solid #444', flexShrink: 0 },
+    leftMenu: { display: 'flex', flexDirection: 'column', padding: '20px', borderRight: '1px solid #444', flexShrink: 0 },
     heading: { fontSize: '2rem', lineHeight: 1.2, color: '#00ffcc', paddingBottom: '20px', marginBottom: '10px' },
     menuButton: { backgroundColor: 'transparent', color: '#ffffff', border: '1px solid #555', padding: '15px 20px', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', transition: 'background-color 0.3s ease, border-color 0.3s ease', textAlign: 'left', width: '240px', marginBottom: '10px' },
     menuButtonActive: { backgroundColor: '#00ffcc20', color: '#00ffcc', border: '1px solid #00ffcc', padding: '15px 20px', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', transition: 'background-color 0.3s ease, border-color 0.3s ease', textAlign: 'left', width: '240px', marginBottom: '10px' },
-    rightContent: { flex: 1, overflowY: 'auto', paddingLeft: '25px' },
-    section: { backgroundColor: '#2a2a2a', padding: '25px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)' },
-    subHeading: { fontSize: '1.8rem', marginBottom: '20px', color: '#00ffcc', textAlign: 'center', borderBottom: '1px solid #444', paddingBottom: '15px' },
+    rightContent: { flex: 1, overflowY: 'auto', padding: '25px', backgroundColor: '#2a2a2a', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)' },
+    section: { padding: '0', borderRadius: '0', boxShadow: 'none', backgroundColor: 'transparent' },
+    subHeadingContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '15px' },
+    subHeading: { fontSize: '1.8rem', color: '#00ffcc', textAlign: 'left', borderBottom: 'none', paddingBottom: '0', margin: 0 },
+    resetButton: { backgroundColor: '#dc3545', color: '#ffffff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontSize: '0.9rem', cursor: 'pointer', transition: 'background-color 0.3s ease', fontWeight: 'bold' },
     subHeading4: { fontSize: '1.2rem', marginTop: '20px', marginBottom: '10px', color: '#00ddb3', borderTop: '1px solid #444', paddingTop: '20px' },
     cardsContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
     card: { backgroundColor: '#333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' },
@@ -325,14 +446,72 @@ const styles: { [key: string]: React.CSSProperties } = {
     toastBase: { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '12px 24px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)', zIndex: 1000, fontSize: '1rem', fontWeight: 500, backdropFilter: 'blur(5px)' },
     toastSuccess: { backgroundColor: 'rgba(40, 167, 69, 0.85)', color: '#ffffff', border: '1px solid rgba(40, 167, 69, 1)' },
     toastError: { backgroundColor: 'rgba(220, 53, 69, 0.85)', color: '#ffffff', border: '1px solid rgba(220, 53, 69, 1)' },
-    formGroup: { marginBottom: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
+    formGroup: { marginBottom: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
+    formGroupRow: { marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
     input: { width: '100%', padding: '8px', backgroundColor: '#333', border: '1px solid #555', borderRadius: '4px', color: '#fff', marginTop: '5px', boxSizing: 'border-box' },
-    radioGroup: { display: 'flex', gap: '20px', marginTop: '5px' },
     matrixContainer: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', backgroundColor: '#1e1e1e', padding: '10px', borderRadius: '4px' },
     matrixCell: { backgroundColor: '#2a2a2a', padding: '5px', textAlign: 'center', borderRadius: '4px' },
     vectorContainer: { display: 'flex', gap: '10px', backgroundColor: '#1e1e1e', padding: '10px', borderRadius: '4px' },
     vectorItem: { display: 'flex', gap: '5px', alignItems: 'center' },
     vectorLabel: { color: '#00ddb3', fontWeight: 'bold' },
+    // New styles for Slider and Switch
+    sliderLabel: { display: 'flex', justifyContent: 'space-between', width: '100%', color: '#eee', fontSize: '1rem' },
+    sliderValue: { color: '#00ffcc', fontWeight: 'bold' },
+    slider: {
+        width: '100%',
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        height: '8px',
+        background: '#444',
+        borderRadius: '5px',
+        outline: 'none',
+        opacity: 0.9,
+        transition: 'opacity .2s',
+        cursor: 'pointer',
+        marginTop: '10px',
+    },
+    switchLabel: {
+        fontSize: '1rem',
+        color: '#eee',
+    },
+    switchContainer: {
+        display: 'flex',
+        alignItems: 'center',
+        cursor: 'pointer',
+    },
+    switch: {
+        position: 'relative',
+        display: 'inline-block',
+        width: '60px',
+        height: '34px',
+        margin: '0 10px',
+    },
+    switchSlider: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        transition: '.4s',
+        borderRadius: '34px',
+    },
+    switchKnob: {
+        position: 'absolute',
+        content: '""',
+        height: '26px',
+        width: '26px',
+        left: '4px',
+        bottom: '4px',
+        backgroundColor: 'white',
+        transition: '.4s',
+        borderRadius: '50%',
+    },
+    switchText: {
+        fontWeight: 'bold',
+        color: '#00ffcc',
+        width: '70px', // Allocate space
+        textAlign: 'center',
+    },
 };
 
 export default Settings;
