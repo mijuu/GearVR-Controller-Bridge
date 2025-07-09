@@ -10,7 +10,8 @@ use enigo::{
 use nalgebra::UnitQuaternion;
 use tauri::AppHandle; // Import AppHandle
 
-use crate::config::mouse_mapper_config::{MouseMapperConfig, MouseMode};
+use crate::config::keymap_config::KeymapConfig;
+use crate::config::mouse_config::{MouseConfig, MouseMode};
 use crate::core::controller::{ButtonState, ControllerState, TouchpadState};
 
 /// Maps controller inputs to mouse and keyboard actions
@@ -19,8 +20,10 @@ pub struct MouseMapper {
     enigo: Enigo,
     /// The Tauri app handle to run commands on the main thread
     app_handle: AppHandle,
-    /// Current configuration
-    pub config: MouseMapperConfig,
+    /// Current mouse configuration
+    pub mouse_config: MouseConfig,
+    /// Current keymap configuration
+    pub keymap_config: KeymapConfig,
     /// Last controller state
     last_state: Option<ControllerState>,
     /// Accumulators for sub-pixel movements from the touchpad.
@@ -48,13 +51,14 @@ pub struct MouseMapper {
 
 impl MouseMapper {
     /// Creates a new mouse mapper with default configuration
-    pub fn new(app_handle: AppHandle, config: MouseMapperConfig) -> Self {
+    pub fn new(app_handle: AppHandle, mouse_config: MouseConfig, keymap_config: KeymapConfig) -> Self {
         let enigo = Enigo::new(&Settings::default()).unwrap();
         let (x, y) = enigo.location().unwrap();
         Self {
             enigo,
             app_handle,
-            config,
+            mouse_config,
+            keymap_config,
             last_state: None,
             remainder_x: 0.0,
             remainder_y: 0.0,
@@ -85,7 +89,7 @@ impl MouseMapper {
 
                 if let Some(last_press_time) = self.home_button_last_press_time {
                     if now.saturating_sub(last_press_time) < DOUBLE_CLICK_WINDOW_MS {
-                        self.config.mode = match self.config.mode {
+                        self.mouse_config.mode = match self.mouse_config.mode {
                             MouseMode::AirMouse => MouseMode::Touchpad,
                             MouseMode::Touchpad => MouseMode::AirMouse,
                         };
@@ -104,7 +108,7 @@ impl MouseMapper {
             // --- Step 2: Handle movement based on the current mode ---
             let delta_t = (state.timestamp - last_timestamp) as f32;
 
-            match self.config.mode {
+            match self.mouse_config.mode {
                 MouseMode::AirMouse => {
                     // --- Air Mouse Mode Logic ---
 
@@ -128,7 +132,7 @@ impl MouseMapper {
                         let rotational_speed_dps = rotation_angle_deg / delta_t_s;
 
                         self.is_air_mouse_active =
-                            rotational_speed_dps > self.config.air_mouse_activation_threshold;
+                            rotational_speed_dps > self.mouse_config.air_mouse_activation_threshold;
                     }
 
                     // Handle touchpad movement, which adds to the target position.
@@ -163,7 +167,7 @@ impl MouseMapper {
 
     /// Handles button state changes by comparing the current state to the last one.
     fn handle_buttons(&mut self, current: &ButtonState, last: &ButtonState) {
-        let mapping = self.config.button_mapping.clone();
+        let mapping = self.keymap_config.clone();
 
         // Helper closure to process a single button's state change
         let mut process_change = |is_pressed: bool, was_pressed: bool, key_map: &Option<String>| {
@@ -340,7 +344,7 @@ impl MouseMapper {
 
             // 2. Define sensitivity for precision mode. A larger FOV means slower movement.
             const PRECISION_MODE_SENSITIVITY_FACTOR: f32 = 10.0;
-            let effective_fov = self.config.air_mouse_fov * PRECISION_MODE_SENSITIVITY_FACTOR;
+            let effective_fov = self.mouse_config.air_mouse_fov * PRECISION_MODE_SENSITIVITY_FACTOR;
             let aspect_ratio = screen_height as f32 / screen_width as f32;
             let vertical_fov = effective_fov * aspect_ratio;
 
@@ -356,9 +360,9 @@ impl MouseMapper {
             self.target_screen_y = target_y.clamp(0, screen_height as i32 - 1);
         } else {
             // --- Normal Mode: Absolute position mapping ---
-            let x_ratio = (horizontal_deg / self.config.air_mouse_fov) + 0.5;
+            let x_ratio = (horizontal_deg / self.mouse_config.air_mouse_fov) + 0.5;
             let aspect_ratio = screen_height as f32 / screen_width as f32;
-            let vertical_fov = self.config.air_mouse_fov * aspect_ratio;
+            let vertical_fov = self.mouse_config.air_mouse_fov * aspect_ratio;
             let y_ratio = (-vertical_deg / vertical_fov) + 0.5;
 
             let target_x = (x_ratio * screen_width as f32).round() as i32;
@@ -389,11 +393,11 @@ impl MouseMapper {
             // Acceleration logic
             let speed_sq = (delta_x.powi(2) + delta_y.powi(2)) / delta_t;
             let effective_speed_sq =
-                (speed_sq - self.config.touchpad_acceleration_threshold).max(0.0);
+                (speed_sq - self.mouse_config.touchpad_acceleration_threshold).max(0.0);
             let acceleration_multiplier =
-                1.0 + (effective_speed_sq * 500.0 * self.config.touchpad_acceleration);
-            let base_dx = delta_x * self.config.touchpad_sensitivity;
-            let base_dy = delta_y * self.config.touchpad_sensitivity;
+                1.0 + (effective_speed_sq * 500.0 * self.mouse_config.touchpad_acceleration);
+            let base_dx = delta_x * self.mouse_config.touchpad_sensitivity;
+            let base_dy = delta_y * self.mouse_config.touchpad_sensitivity;
 
             // Sub-pixel movement logic
             let desired_dx_float = base_dx * acceleration_multiplier;

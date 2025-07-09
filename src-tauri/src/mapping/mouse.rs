@@ -5,29 +5,33 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tauri::AppHandle;
 
-use crate::config::mouse_mapper_config::MouseMapperConfig;
+use crate::config::keymap_config::KeymapConfig;
+use crate::config::mouse_config::MouseConfig;
 use crate::core::controller::ControllerState;
 use crate::mapping::mouse_mapper::{MouseMapper};
 enum MouseMapperCommand {
     Update(ControllerState),
-    UpdateConfig(MouseMapperConfig),
+    UpdateMouseConfig(MouseConfig),
+    UpdateKeymapConfig(KeymapConfig),
 }
 
 /// A clonable handle that sends commands to the dedicated MouseMapper thread.
 #[derive(Clone)]
 pub struct MouseMapperSender {
-    pub config: MouseMapperConfig,
+    pub mouse_config: MouseConfig,
+    pub keymap_config: KeymapConfig,
     tx: mpsc::Sender<MouseMapperCommand>,
 }
 
 impl MouseMapperSender {
-    pub fn new(app_handle: &AppHandle, config: MouseMapperConfig) -> Self {
+    pub fn new(app_handle: &AppHandle, mouse_config: MouseConfig, keymap_config: KeymapConfig) -> Self {
         let (tx, mut rx) = mpsc::channel(32);
-        let mouse_mapper_config = config.clone();
+        let initial_mouse_config = mouse_config.clone();
+        let initial_keymap_config = keymap_config.clone();
         let app_handle_clone = app_handle.clone();
 
         thread::spawn(move || {
-            let mut mouse_mapper = MouseMapper::new(app_handle_clone, mouse_mapper_config);
+            let mut mouse_mapper = MouseMapper::new(app_handle_clone, initial_mouse_config, initial_keymap_config);
             info!("MouseMapper thread with interpolation started.");
 
             // 定义我们的平滑循环频率，例如 250Hz
@@ -44,9 +48,13 @@ impl MouseMapperSender {
                             mouse_mapper.update(&state);
                             last_update_time = Instant::now();
                         },
-                        MouseMapperCommand::UpdateConfig(new_config) => {
-                            info!("Updating MouseMapper config");
-                            mouse_mapper.config = new_config;
+                        MouseMapperCommand::UpdateMouseConfig(new_mouse_config) => {
+                            info!("Updating Mouse config");
+                            mouse_mapper.mouse_config = new_mouse_config;
+                        },
+                        MouseMapperCommand::UpdateKeymapConfig(new_keymap_config) => {
+                            info!("Updating Keymap config");
+                            mouse_mapper.keymap_config = new_keymap_config;
                         }
                     }
                 }
@@ -62,7 +70,7 @@ impl MouseMapperSender {
             }
         });
 
-        Self { config, tx }
+        Self { mouse_config, keymap_config, tx }
     }
 
     pub async fn update(&self, state: ControllerState) -> Result<()> {
@@ -70,9 +78,17 @@ impl MouseMapperSender {
         Ok(())
     }
 
-    pub async fn update_config(&self, config: MouseMapperConfig) {
-        if let Err(e) = self.tx.send(MouseMapperCommand::UpdateConfig(config)).await {
-            warn!("Failed to send config update to mouse mapper thread: {}", e);
+    pub async fn update_mouse_config(&mut self, mouse_config: MouseConfig) {
+        self.mouse_config = mouse_config.clone();
+        if let Err(e) = self.tx.send(MouseMapperCommand::UpdateMouseConfig(mouse_config)).await {
+            warn!("Failed to send config update to mouse thread: {}", e);
+        }
+    }
+
+    pub async fn update_keymap_config(&mut self, keymap_config: KeymapConfig) {
+        self.keymap_config = keymap_config.clone();
+        if let Err(e) = self.tx.send(MouseMapperCommand::UpdateKeymapConfig(keymap_config)).await {
+            warn!("Failed to send config update to key mapper thread: {}", e);
         }
     }
 }

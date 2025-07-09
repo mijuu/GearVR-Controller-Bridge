@@ -5,37 +5,7 @@ use anyhow::Result;
 use tokio::fs;
 use log::{error, info, warn};
 
-const CONFIG_FILE_NAME: &str = "mouse_mapper_config.json";
-
-/// Configuration for button mappings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ButtonMapping {
-    /// Trigger button mapping
-    pub trigger: Option<String>,
-    /// Home button mapping
-    pub home: Option<String>,
-    /// Back button mapping
-    pub back: Option<String>,
-    /// Volume up button mapping
-    pub volume_up: Option<String>,
-    /// Volume down button mapping
-    pub volume_down: Option<String>,
-    /// Touchpad click mapping
-    pub touchpad: Option<String>,
-}
-
-impl Default for ButtonMapping {
-    fn default() -> Self {
-        ButtonMapping {
-            trigger: Some("Left".to_string()),   // Left mouse button by default
-            home: Some("".to_string()),       // Escape key by default
-            back: Some("Backspace".to_string()), // Backspace key by default
-            volume_up: Some("Volume up".to_string()), // Volume up
-            volume_down: Some("Volume down".to_string()), // Volume down
-            touchpad: Some("Right".to_string()), // Right mouse button by default
-        }
-    }
-}
+const CONFIG_FILE_NAME: &str = "mouse_config.json";
 
 /// Mouse movement mode
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -46,13 +16,11 @@ pub enum MouseMode {
     Touchpad,
 }
 
-/// Mouse mapper configuration
+/// Mouse settings configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MouseMapperConfig {
+pub struct MouseConfig {
     /// Mouse movement mode
     pub mode: MouseMode,
-    /// Button mappings
-    pub button_mapping: ButtonMapping,
     /// Mouse sensitivity for touchpad mode
     pub touchpad_sensitivity: f32,
     /// Acceleration factor for touchpad mode. 0.0 means no acceleration.
@@ -66,11 +34,10 @@ pub struct MouseMapperConfig {
     pub air_mouse_activation_threshold: f32,
 }
 
-impl Default for MouseMapperConfig {
+impl Default for MouseConfig {
     fn default() -> Self {
-        MouseMapperConfig {
+        MouseConfig {
             mode: MouseMode::Touchpad,
-            button_mapping: ButtonMapping::default(),
             touchpad_sensitivity: 500.0,
             touchpad_acceleration: 1.2,
             touchpad_acceleration_threshold: 0.0002,
@@ -80,7 +47,7 @@ impl Default for MouseMapperConfig {
     }
 }
 
-impl MouseMapperConfig {
+impl MouseConfig {
     /// Loads the config from a configuration file.
     pub async fn load_config(app_handle: &AppHandle) -> Result<Self> {
         let config_dir = app_handle.path().app_config_dir()?;
@@ -88,14 +55,14 @@ impl MouseMapperConfig {
         let file_path_str = file_path.to_string_lossy().into_owned();
 
         if !file_path.exists() {
-            warn!("Mouse mapper config file not found at {:?}, using default.", file_path_str);
+            warn!("Mouse config file not found at {:?}, using default.", file_path_str);
             return Ok(Self::default());
         }
 
         let config_json = fs::read_to_string(file_path).await?;
         let config: Self = serde_json::from_str(&config_json)?;
 
-        info!("Mouse mapper config loaded from {:?}", file_path_str);
+        info!("Mouse config loaded from {:?}", file_path_str);
         Ok(config)
     }
 
@@ -110,13 +77,13 @@ impl MouseMapperConfig {
         let config_json = match serde_json::to_string_pretty(&self) {
             Ok(json) => json,
             Err(e) => {
-                error!("Failed to serialize mouse mapper config to JSON: {}", e);
+                error!("Failed to serialize mouse config to JSON: {}", e);
                 return Err(e.into());
             }
         };
 
         fs::write(file_path.to_path_buf(), config_json).await?;
-        info!("Mouse mapper config saved to {:?}", file_path_str);
+        info!("Mouse config saved to {:?}", file_path_str);
         Ok(())
     }
 }

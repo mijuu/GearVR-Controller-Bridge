@@ -25,10 +25,9 @@ interface ControllerConfig {
   gyro_calibration: GyroCalibration;
 }
 
-interface MouseMapperConfig {
+// --- New split config types ---
+interface MouseConfig {
   mode: 'AirMouse' | 'Touchpad';
-  button_mapping: { [key: string]: string | null };
-  air_mouse_sensitivity: number;
   touchpad_sensitivity: number;
   touchpad_acceleration: number;
   touchpad_acceleration_threshold: number;
@@ -36,15 +35,24 @@ interface MouseMapperConfig {
   air_mouse_activation_threshold: number;
 }
 
+interface KeymapConfig {
+  trigger: string | null;
+  home: string | null;
+  back: string | null;
+  volume_up: string | null;
+  volume_down: string | null;
+  touchpad: string | null;
+}
+
 interface SettingsProps {
   onBackToController: (view: 'controller') => void;
 }
 
-type ActiveMenu = 'calibration' | 'controller' | 'mouse';
+type ActiveMenu = 'calibration' | 'controller' | 'mouse' | 'keymap';
 type CalibrationStatus = 'idle' | 'calibrating' | 'success' | 'failed';
 type ToastType = 'success' | 'error';
 
-// --- Reusable UI Components ---
+// --- Reusable UI Components (unchanged) ---
 
 const Slider: React.FC<{
   label: string;
@@ -105,7 +113,7 @@ const Switch: React.FC<{
 };
 
 
-// --- Sub-components ---
+// --- Sub-components (unchanged) ---
 
 const CalibrationCard: React.FC<any> = ({ title, description, status, calibrationStep, onStart }) => {
     const renderStatus = () => {
@@ -166,18 +174,18 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
   const [gyroCalibrationStatus, setGyroCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [calibrationStep, setCalibrationStep] = useState('');
   const [controllerConfig, setControllerConfig] = useState<ControllerConfig | null>(null);
-  const [mouseMapperConfig, setMouseMapperConfig] = useState<MouseMapperConfig | null>(null);
+  const [mouseConfig, setMouseConfig] = useState<MouseConfig | null>(null);
+  const [keymapConfig, setKeymapConfig] = useState<KeymapConfig | null>(null);
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>('calibration');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [capturingKeyFor, setCapturingKeyFor] = useState<string | null>(null);
 
-  // Per user feedback, use hardcoded factory defaults to avoid ambiguity.
   const factoryDefaultMappings: { [key: string]: string | null } = {
-    t1rigger: 'Left',
+    trigger: 'Left',
     home: '',
     back: 'Backspace',
-    volume_up: 'Volume Up',
-    volume_down: 'Volume Down',
+    volume_up: 'Volume up',
+    volume_down: 'Volume down',
     touchpad: 'Right',
   };
 
@@ -186,36 +194,46 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleConfigChange = useCallback((type: 'controller' | 'mouse', field: string, value: any, isButtonMapping = false) => {
-    let newConfig;
-    if (type === 'controller') {
-        if (!controllerConfig) return;
-        newConfig = { ...controllerConfig, [field]: parseFloat(value) };
-        setControllerConfig(newConfig);
-    } else {
-        if (!mouseMapperConfig) return;
-        if (isButtonMapping) {
-            const newButtonMapping = { ...mouseMapperConfig.button_mapping, [field]: value || null };
-            newConfig = { ...mouseMapperConfig, button_mapping: newButtonMapping };
-        } else {
-            newConfig = { ...mouseMapperConfig, [field]: value };
-        }
-        setMouseMapperConfig(newConfig);
-    }
-
-    const command = type === 'controller' ? 'set_controller_config' : 'set_mouse_mapper_config';
-    invoke(command, { config: newConfig })
-        .then(() => showToast(`${type === 'controller' ? '控制器' : '鼠标'}设置已保存`, 'success'))
+  const handleControllerConfigChange = useCallback((field: string, value: any) => {
+    if (!controllerConfig) return;
+    const newConfig = { ...controllerConfig, [field]: parseFloat(value) };
+    setControllerConfig(newConfig);
+    invoke('set_controller_config', { config: newConfig })
+        .then(() => showToast('控制器设置已保存', 'success'))
         .catch(err => {
             showToast('保存失败', 'error');
-            console.error(`Failed to save ${type} config:`, err);
+            console.error('Failed to save controller config:', err);
         });
-  }, [controllerConfig, mouseMapperConfig]);
+  }, [controllerConfig]);
+
+  const handleMouseConfigChange = useCallback((field: keyof MouseConfig, value: any) => {
+    if (!mouseConfig) return;
+    const newConfig = { ...mouseConfig, [field]: value };
+    setMouseConfig(newConfig);
+    invoke('set_mouse_config', { config: newConfig })
+        .then(() => showToast('鼠标设置已保存', 'success'))
+        .catch(err => {
+            showToast('保存失败', 'error');
+            console.error('Failed to save mouse config:', err);
+        });
+  }, [mouseConfig]);
+
+  const handleKeymapChange = useCallback((key: keyof KeymapConfig, value: string | null) => {
+    if (!keymapConfig) return;
+    const newConfig = { ...keymapConfig, [key]: value };
+    setKeymapConfig(newConfig);
+    invoke('set_keymap_config', { config: newConfig })
+        .then(() => showToast('按键映射已保存', 'success'))
+        .catch(err => {
+            showToast('保存失败', 'error');
+            console.error('Failed to save keymap config:', err);
+        });
+  }, [keymapConfig]);
 
   useEffect(() => {
     const handleCapture = (keyString: string | null) => {
         if (!capturingKeyFor) return;
-        handleConfigChange('mouse', capturingKeyFor, keyString, true);
+        handleKeymapChange(capturingKeyFor as keyof KeymapConfig, keyString);
         setCapturingKeyFor(null);
     };
 
@@ -225,11 +243,10 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
 
         if (event.key === 'Escape') {
             if (capturingKeyFor) {
-                // Restore to factory default for the specific key being captured.
                 const defaultValue = factoryDefaultMappings[capturingKeyFor.toLowerCase()];
                 return handleCapture(defaultValue ?? null);
             }
-            return handleCapture(null); // Should not happen, but as a fallback.
+            return handleCapture(null);
         }
 
         const parts = [];
@@ -237,13 +254,11 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
         if (event.altKey) parts.push('Alt');
         if (event.shiftKey) parts.push('Shift');
         
-        // Use event.key for a consistent representation of the key
         const keyName = event.key;
         if (!['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
             parts.push(keyName);
         }
         
-        // Only capture if there is a main key pressed, not just modifiers
         if (parts.length > (event.ctrlKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0)) {
             handleCapture(parts.join('+'));
         }
@@ -270,7 +285,6 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
     if (capturingKeyFor) {
         window.addEventListener('keydown', handleKeyDown, true);
         window.addEventListener('mousedown', handleMouseDown, true);
-        // Disable context menu while capturing to allow right-click capture
         window.addEventListener('contextmenu', preventDefault, true);
     } 
 
@@ -279,7 +293,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
         window.removeEventListener('mousedown', handleMouseDown, true);
         window.removeEventListener('contextmenu', preventDefault, true);
     };
-  }, [capturingKeyFor, handleConfigChange]);
+  }, [capturingKeyFor, handleKeymapChange]);
 
   useEffect(() => {
     const unlistenStep = listen<string>('calibration-step', (event) => setCalibrationStep(event.payload));
@@ -293,8 +307,11 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
     if (controllerConfig === null) {
         invoke<ControllerConfig>('get_controller_config').then(setControllerConfig).catch(console.error);
     }
-    if (mouseMapperConfig === null) {
-        invoke<MouseMapperConfig>('get_mouse_mapper_config').then(setMouseMapperConfig).catch(console.error);
+    if (mouseConfig === null) {
+        invoke<MouseConfig>('get_mouse_config').then(setMouseConfig).catch(console.error);
+    }
+    if (keymapConfig === null) {
+        invoke<KeymapConfig>('get_keymap_config').then(setKeymapConfig).catch(console.error);
     }
 
     return () => {
@@ -338,21 +355,32 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
     }
   };
 
-  const handleResetMouseMapperConfig = async () => {
+  const handleResetMouseConfig = async () => {
     try {
-      const config = await invoke<MouseMapperConfig>('reset_mouse_mapper_config');
-      setMouseMapperConfig(config);
-      showToast('鼠标设置已重置为默认值 (不含按键映射)', 'success');
+      const config = await invoke<MouseConfig>('reset_mouse_config');
+      setMouseConfig(config);
+      showToast('鼠标设置已重置为默认值', 'success');
     } catch (err) {
       showToast('重置失败', 'error');
-      console.error('Failed to reset mouse mapper config:', err);
+      console.error('Failed to reset mouse config:', err);
+    }
+  };
+
+  const handleResetKeymapConfig = async () => {
+    try {
+      const config = await invoke<KeymapConfig>('reset_keymap_config');
+      setKeymapConfig(config);
+      showToast('按键映射已重置为默认值', 'success');
+    } catch (err) {
+      showToast('重置失败', 'error');
+      console.error('Failed to reset keymap config:', err);
     }
   };
 
   const renderContent = () => {
     switch (activeMenu) {
       case 'calibration':
-        return (
+        return controllerConfig && (
           <div style={styles.section}>
             <div style={styles.subHeadingContainer}>
                 <h3 style={styles.subHeading}>传感器校准</h3>
@@ -360,6 +388,17 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
             <div style={styles.cardsContainer}>
                 <CalibrationCard title="磁力计校准" description="用于修正方向漂移，提高指向精度。" status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? calibrationStep : undefined} onStart={handleStartMagCalibration} />
                 <CalibrationCard title="陀螺仪校准" description="用于修正旋转过程中的抖动和偏移。" status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? '校准中，请保持设备静止...' : undefined} onStart={handleStartGyroCalibration} />
+
+                <div style={styles.card}>
+                  <h4 style={styles.subHeading4}>陀螺仪校准数据 (只读)</h4>
+                  <VectorDisplay vector={controllerConfig.gyro_calibration.zero_bias} />
+
+                  <h4 style={styles.subHeading4}>磁力计校准数据 (只读)</h4>
+                  <label>Hard Iron Bias</label>
+                  <VectorDisplay vector={controllerConfig.mag_calibration.hard_iron_bias} />
+                  <label style={{marginTop: '10px'}}>Soft Iron Matrix</label>
+                  <MatrixDisplay matrix={controllerConfig.mag_calibration.soft_iron_matrix} />
+                </div>
             </div>
           </div>
         );
@@ -374,97 +413,97 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                     label="传感器低通滤波 (alpha)"
                     min={0} max={1} step={0.01} value={controllerConfig.sensor_low_pass_alpha}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, sensor_low_pass_alpha: v })}
-                    onAfterChange={() => handleConfigChange('controller', 'sensor_low_pass_alpha', controllerConfig.sensor_low_pass_alpha)}
+                    onAfterChange={() => handleControllerConfigChange('sensor_low_pass_alpha', controllerConfig.sensor_low_pass_alpha)}
                     precision={2}
                 />
                 <Slider
                     label="时间步长平滑 (alpha)"
                     min={0} max={1} step={0.01} value={controllerConfig.delta_t_smoothing_alpha}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, delta_t_smoothing_alpha: v })}
-                    onAfterChange={() => handleConfigChange('controller', 'delta_t_smoothing_alpha', controllerConfig.delta_t_smoothing_alpha)}
+                    onAfterChange={() => handleControllerConfigChange('delta_t_smoothing_alpha', controllerConfig.delta_t_smoothing_alpha)}
                     precision={2}
                 />
                 <Slider
                     label="磁力计信任度 (Beta)"
                     min={0} max={1} step={0.01} value={controllerConfig.madgwick_beta}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, madgwick_beta: v })}
-                    onAfterChange={() => handleConfigChange('controller', 'madgwick_beta', controllerConfig.madgwick_beta)}
+                    onAfterChange={() => handleControllerConfigChange('madgwick_beta', controllerConfig.madgwick_beta)}
                     precision={2}
                 />
                 <Slider
                     label="姿态平滑因子"
                     min={0} max={1} step={0.01} value={controllerConfig.orientation_smoothing_factor}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, orientation_smoothing_factor: v })}
-                    onAfterChange={() => handleConfigChange('controller', 'orientation_smoothing_factor', controllerConfig.orientation_smoothing_factor)}
+                    onAfterChange={() => handleControllerConfigChange('orientation_smoothing_factor', controllerConfig.orientation_smoothing_factor)}
                     precision={2}
                 />
                 <Slider
                     label="本地地磁场强度 (μT)"
                     min={20} max={70} step={1} value={controllerConfig.local_earth_mag_field}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, local_earth_mag_field: v })}
-                    onAfterChange={() => handleConfigChange('controller', 'local_earth_mag_field', controllerConfig.local_earth_mag_field)}
+                    onAfterChange={() => handleControllerConfigChange('local_earth_mag_field', controllerConfig.local_earth_mag_field)}
                     precision={0}
                 />
-              <h4 style={styles.subHeading4}>陀螺仪校准数据 (只读)</h4>
-              <VectorDisplay vector={controllerConfig.gyro_calibration.zero_bias} />
-
-              <h4 style={styles.subHeading4}>磁力计校准数据 (只读)</h4>
-              <label>Hard Iron Bias</label>
-              <VectorDisplay vector={controllerConfig.mag_calibration.hard_iron_bias} />
-              <label style={{marginTop: '10px'}}>Soft Iron Matrix</label>
-              <MatrixDisplay matrix={controllerConfig.mag_calibration.soft_iron_matrix} />
             </div>
           );
       case 'mouse':
-        return mouseMapperConfig && (
+        return mouseConfig && (
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
-                    <h3 style={styles.subHeading}>鼠标映射设置</h3>
-                    <button onClick={handleResetMouseMapperConfig} style={styles.resetButton}>重置</button>
+                    <h3 style={styles.subHeading}>鼠标设置</h3>
+                    <button onClick={handleResetMouseConfig} style={styles.resetButton}>重置</button>
                 </div>
                 <Switch
                     label="启用AirMouse (双击Home快捷开启)"
-                    checked={mouseMapperConfig.mode === 'AirMouse'}
-                    onChange={(isChecked) => handleConfigChange('mouse', 'mode', isChecked ? 'AirMouse' : 'Touchpad')}
+                    checked={mouseConfig.mode === 'AirMouse'}
+                    onChange={(isChecked) => handleMouseConfigChange('mode', isChecked ? 'AirMouse' : 'Touchpad')}
                 />
                 <Slider
                     label="触摸板灵敏度"
-                    min={1} max={1000} step={1} value={mouseMapperConfig.touchpad_sensitivity}
-                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_sensitivity: v})}
-                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_sensitivity', mouseMapperConfig.touchpad_sensitivity)}
+                    min={1} max={1000} step={1} value={mouseConfig.touchpad_sensitivity}
+                    onChange={(v) => setMouseConfig({...mouseConfig, touchpad_sensitivity: v})}
+                    onAfterChange={() => handleMouseConfigChange('touchpad_sensitivity', mouseConfig.touchpad_sensitivity)}
                     precision={0}
                 />
                 <Slider
                     label="触摸板加速度"
-                    min={0} max={10} step={0.1} value={mouseMapperConfig.touchpad_acceleration}
-                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration: v})}
-                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_acceleration', mouseMapperConfig.touchpad_acceleration)}
+                    min={0} max={10} step={0.1} value={mouseConfig.touchpad_acceleration}
+                    onChange={(v) => setMouseConfig({...mouseConfig, touchpad_acceleration: v})}
+                    onAfterChange={() => handleMouseConfigChange('touchpad_acceleration', mouseConfig.touchpad_acceleration)}
                     precision={1}
                 />
                 <Slider
                     label="触摸板加速度阈值"
-                    min={0} max={0.01} step={0.0001} value={mouseMapperConfig.touchpad_acceleration_threshold}
-                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, touchpad_acceleration_threshold: v})}
-                    onAfterChange={() => handleConfigChange('mouse', 'touchpad_acceleration_threshold', mouseMapperConfig.touchpad_acceleration_threshold)}
+                    min={0} max={0.01} step={0.0001} value={mouseConfig.touchpad_acceleration_threshold}
+                    onChange={(v) => setMouseConfig({...mouseConfig, touchpad_acceleration_threshold: v})}
+                    onAfterChange={() => handleMouseConfigChange('touchpad_acceleration_threshold', mouseConfig.touchpad_acceleration_threshold)}
                     precision={4}
                 />
                 <Slider
                     label="空中鼠标灵敏度 (FOV)"
-                    min={10} max={180} step={1} value={mouseMapperConfig.air_mouse_fov}
-                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_fov: v})}
-                    onAfterChange={() => handleConfigChange('mouse', 'air_mouse_fov', mouseMapperConfig.air_mouse_fov)}
+                    min={10} max={180} step={1} value={mouseConfig.air_mouse_fov}
+                    onChange={(v) => setMouseConfig({...mouseConfig, air_mouse_fov: v})}
+                    onAfterChange={() => handleMouseConfigChange('air_mouse_fov', mouseConfig.air_mouse_fov)}
                     precision={0}
                 />
                 <Slider
                     label="空中鼠标激活阈值"
-                    min={0} max={20} step={0.5} value={mouseMapperConfig.air_mouse_activation_threshold}
-                    onChange={(v) => setMouseMapperConfig({...mouseMapperConfig, air_mouse_activation_threshold: v})}
-                    onAfterChange={() => handleConfigChange('mouse', 'air_mouse_activation_threshold', mouseMapperConfig.air_mouse_activation_threshold)}
+                    min={0} max={20} step={0.5} value={mouseConfig.air_mouse_activation_threshold}
+                    onChange={(v) => setMouseConfig({...mouseConfig, air_mouse_activation_threshold: v})}
+                    onAfterChange={() => handleMouseConfigChange('air_mouse_activation_threshold', mouseConfig.air_mouse_activation_threshold)}
                     precision={1}
                 />
-    
-              <h4 style={styles.subHeading4}>按键映射 (单击以设置, Esc还原默认)</h4>
-              {Object.entries(mouseMapperConfig.button_mapping).map(([key, value]) => (
+            </div>
+          );
+      case 'keymap':
+        return keymapConfig && (
+            <div style={styles.section}>
+                <div style={styles.subHeadingContainer}>
+                    <h3 style={styles.subHeading}>按键映射</h3>
+                    <button onClick={handleResetKeymapConfig} style={styles.resetButton}>重置</button>
+                </div>
+                <h4 style={styles.subHeading4}>按键映射 (单击以设置, Esc还原默认)</h4>
+                {Object.entries(keymapConfig).map(([key, value]) => (
                 <div style={styles.formGroupRow} key={key}>
                   <label style={styles.keymapLabel}>{key}</label>
                   <button 
@@ -476,7 +515,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                 </div>
               ))}
             </div>
-          );
+        );
       default:
         return null;
     }
@@ -489,7 +528,8 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                 <h2 style={styles.heading}>设置</h2>
                 <button style={activeMenu === 'calibration' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('calibration')}>传感器校准</button>
                 <button style={activeMenu === 'controller' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('controller')}>控制器设置</button>
-                <button style={activeMenu === 'mouse' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('mouse')}>鼠标映射设置</button>
+                <button style={activeMenu === 'mouse' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('mouse')}>鼠标设置</button>
+                <button style={activeMenu === 'keymap' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('keymap')}>按键映射</button>
                 <button style={{...styles.menuButton, marginTop: 'auto'}} onClick={() => onBackToController('controller')}>← 返回控制器界面</button>
             </div>
             <div style={styles.rightContent}>
@@ -510,10 +550,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     menuButtonActive: { backgroundColor: '#00ffcc20', color: '#00ffcc', border: '1px solid #00ffcc', padding: '15px 20px', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', transition: 'background-color 0.3s ease, border-color 0.3s ease', textAlign: 'left', width: '240px', marginBottom: '10px' },
     rightContent: { flex: 1, overflowY: 'auto', padding: '25px', backgroundColor: '#2a2a2a', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)' },
     section: { padding: '0', borderRadius: '0', boxShadow: 'none', backgroundColor: 'transparent' },
-    subHeadingContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '15px' },
+    subHeadingContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '52px', marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '15px' },
     subHeading: { fontSize: '1.8rem', color: '#00ffcc', textAlign: 'left', borderBottom: 'none', paddingBottom: '0', margin: 0 },
     resetButton: { backgroundColor: '#dc3545', color: '#ffffff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontSize: '0.9rem', cursor: 'pointer', transition: 'background-color 0.3s ease', fontWeight: 'bold' },
-    subHeading4: { fontSize: '1.2rem', marginTop: '20px', marginBottom: '10px', color: '#00ddb3', borderTop: '1px solid #444', paddingTop: '20px' },
+    subHeading4: { fontSize: '1.2rem', marginTop: '20px', marginBottom: '10px', color: '#00ddb3' },
     cardsContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
     card: { backgroundColor: '#333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' },
     cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
@@ -626,4 +666,3 @@ const styles: { [key: string]: React.CSSProperties } = {
 };
 
 export default Settings;
-

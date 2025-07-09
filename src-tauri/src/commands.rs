@@ -2,8 +2,9 @@
 //! This module defines all the commands that can be invoked from the frontend.
 
 use crate::state::AppState;
-use crate::config::mouse_mapper_config::MouseMapperConfig;
 use crate::config::controller_config::ControllerConfig;
+use crate::config::keymap_config::KeymapConfig;
+use crate::config::mouse_config::MouseConfig;
 use anyhow::{Result};
 use tauri::{AppHandle, State, Window};
 use log::{error};
@@ -168,41 +169,6 @@ pub async fn set_controller_config(
     Ok(())
 }
 
-/// Gets the current mouse mapper configuration.
-#[tauri::command]
-pub async fn get_mouse_mapper_config(
-    app_state: State<'_, AppState>,
-) -> Result<MouseMapperConfig, String> {
-    let mouse_sender_arc = app_state.mouse_sender.clone();
-    let mouse_sender_guard = mouse_sender_arc.lock().await;
-
-    Ok(mouse_sender_guard.config.clone())
-}
-
-/// Sets the mouse mapper configuration.
-#[tauri::command]
-pub async fn set_mouse_mapper_config(
-    config: MouseMapperConfig,
-    app_handle: AppHandle,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
-    let mouse_sender_arc = app_state.mouse_sender.clone();
-    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
-
-    // Update the config in the sender, which is the primary copy
-    mouse_sender_guard.config = config.clone();
-
-    // Save the updated config to disk
-    if let Err(e) = mouse_sender_guard.config.save_config(&app_handle).await {
-        error!("Failed to save mouse mapper config: {}", e)
-    }
-
-    // Send the updated config to the background thread
-    mouse_sender_guard.update_config(config).await;
-
-    Ok(())
-}
-
 /// Resets the controller configuration to its default values.
 #[tauri::command]
 pub async fn reset_controller_config(
@@ -228,32 +194,117 @@ pub async fn reset_controller_config(
     Ok(new_config)
 }
 
-/// Resets the mouse mapper configuration to its default values, preserving button mappings.
+// --- MouseConfig Commands ---
+
 #[tauri::command]
-pub async fn reset_mouse_mapper_config(
+pub async fn get_mouse_config(
+    app_state: State<'_, AppState>,
+) -> Result<MouseConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mouse_sender_guard = mouse_sender_arc.lock().await;
+    Ok(mouse_sender_guard.mouse_config.clone())
+}
+
+#[tauri::command]
+pub async fn set_mouse_config(
     app_handle: AppHandle,
     app_state: State<'_, AppState>,
-) -> Result<MouseMapperConfig, String> {
+    config: MouseConfig,
+) -> Result<(), String> {
     let mouse_sender_arc = app_state.mouse_sender.clone();
     let mut mouse_sender_guard = mouse_sender_arc.lock().await;
 
-    // Create a default config but preserve the existing button mapping
-    let mut new_config = MouseMapperConfig::default();
-    new_config.button_mapping = mouse_sender_guard.config.button_mapping.clone();
+    mouse_sender_guard.mouse_config = config.clone();
 
-    // Update the config in the sender
-    mouse_sender_guard.config = new_config.clone();
+    mouse_sender_guard.update_mouse_config(
+        config.clone()
+    ).await;
 
-    // Save the updated config to disk
-    if let Err(e) = mouse_sender_guard.config.save_config(&app_handle).await {
-        error!("Failed to save mouse mapper config after reset: {}", e);
+    if let Err(e) = mouse_sender_guard.mouse_config.save_config(&app_handle).await {
+        error!("Failed to save mouse config: {}", e);
     }
 
-    // Send the updated config to the background thread
-    mouse_sender_guard.update_config(new_config.clone()).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reset_mouse_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+) -> Result<MouseConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    let new_config = MouseConfig::default();
+    mouse_sender_guard.mouse_config = new_config.clone();
+
+    mouse_sender_guard.update_mouse_config(
+        new_config.clone()
+    ).await;
+
+
+    if let Err(e) = mouse_sender_guard.mouse_config.save_config(&app_handle).await {
+        error!("Failed to save mouse config after reset: {}", e);
+    }
 
     Ok(new_config)
 }
+
+// --- KeymapConfig Commands ---
+
+#[tauri::command]
+pub async fn get_keymap_config(
+    app_state: State<'_, AppState>,
+) -> Result<KeymapConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mouse_sender_guard = mouse_sender_arc.lock().await;
+    Ok(mouse_sender_guard.keymap_config.clone())
+}
+
+#[tauri::command]
+pub async fn set_keymap_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+    config: KeymapConfig,
+) -> Result<(), String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    mouse_sender_guard.keymap_config = config.clone();
+
+    mouse_sender_guard.update_keymap_config(
+        config.clone()
+    ).await;
+
+    if let Err(e) = mouse_sender_guard.keymap_config.save_config(&app_handle).await {
+        error!("Failed to save keymap config: {}", e);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reset_keymap_config(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+) -> Result<KeymapConfig, String> {
+    let mouse_sender_arc = app_state.mouse_sender.clone();
+    let mut mouse_sender_guard = mouse_sender_arc.lock().await;
+
+    let new_config = KeymapConfig::default();
+    mouse_sender_guard.keymap_config = new_config.clone();
+
+    mouse_sender_guard.update_keymap_config(
+        new_config.clone()
+    ).await;
+
+    if let Err(e) = mouse_sender_guard.keymap_config.save_config(&app_handle).await {
+        error!("Failed to save keymap config after reset: {}", e);
+    }
+
+    Ok(new_config)
+}
+
 
 #[macro_export]
 macro_rules! export_commands {
@@ -271,9 +322,12 @@ macro_rules! export_commands {
             $crate::commands::get_controller_config,
             $crate::commands::set_controller_config,
             $crate::commands::reset_controller_config,
-            $crate::commands::get_mouse_mapper_config,
-            $crate::commands::set_mouse_mapper_config,
-            $crate::commands::reset_mouse_mapper_config
+            $crate::commands::get_mouse_config,
+            $crate::commands::set_mouse_config,
+            $crate::commands::reset_mouse_config,
+            $crate::commands::get_keymap_config,
+            $crate::commands::set_keymap_config,
+            $crate::commands::reset_keymap_config
         ]
     };
 }
