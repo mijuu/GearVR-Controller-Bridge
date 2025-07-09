@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -169,61 +169,24 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
   const [mouseMapperConfig, setMouseMapperConfig] = useState<MouseMapperConfig | null>(null);
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>('calibration');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [capturingKeyFor, setCapturingKeyFor] = useState<string | null>(null);
+
+  // Per user feedback, use hardcoded factory defaults to avoid ambiguity.
+  const factoryDefaultMappings: { [key: string]: string | null } = {
+    t1rigger: 'Left',
+    home: '',
+    back: 'Backspace',
+    volume_up: 'Volume Up',
+    volume_down: 'Volume Down',
+    touchpad: 'Right',
+  };
 
   const showToast = (message: string, type: ToastType = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    const unlistenStep = listen<string>('calibration-step', (event) => setCalibrationStep(event.payload));
-    const unlistenFinished = listen<boolean>('calibration-finished', (event) => {
-      if (magCalibrationStatus === 'calibrating') {
-        setMagCalibrationStatus(event.payload ? 'success' : 'failed');
-        // Refresh config to show new calibration data
-        invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
-      }
-    });
-
-    // Initial load
-    if (controllerConfig === null) {
-        invoke<ControllerConfig>('get_controller_config').then(setControllerConfig).catch(console.error);
-    }
-    if (mouseMapperConfig === null) {
-        invoke<MouseMapperConfig>('get_mouse_mapper_config').then(setMouseMapperConfig).catch(console.error);
-    }
-
-    return () => {
-      unlistenStep.then(f => f());
-      unlistenFinished.then(f => f());
-    };
-  }, [magCalibrationStatus]); // Dependency ensures the listener always has the latest status
-
-  const handleStartMagCalibration = async () => {
-    try {
-      setMagCalibrationStatus('calibrating');
-      setCalibrationStep('请拿起控制器，在空中画8字形...');
-      await invoke('start_mag_calibration_wizard');
-    } catch (error) {
-      console.error('Failed to start mag calibration:', error);
-      setMagCalibrationStatus('failed');
-    }
-  };
-
-  const handleStartGyroCalibration = async () => {
-    setGyroCalibrationStatus('calibrating');
-    setCalibrationStep('请将控制器静置在平坦表面上...');
-    try {
-      await invoke('start_gyro_calibration');
-      setGyroCalibrationStatus('success');
-      invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
-    } catch (error) {
-      console.error('Failed to start gyro calibration:', error);
-      setGyroCalibrationStatus('failed');
-    }
-  };
-
-  const handleConfigChange = (type: 'controller' | 'mouse', field: string, value: any, isButtonMapping = false) => {
+  const handleConfigChange = useCallback((type: 'controller' | 'mouse', field: string, value: any, isButtonMapping = false) => {
     let newConfig;
     if (type === 'controller') {
         if (!controllerConfig) return;
@@ -247,6 +210,121 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
             showToast('保存失败', 'error');
             console.error(`Failed to save ${type} config:`, err);
         });
+  }, [controllerConfig, mouseMapperConfig]);
+
+  useEffect(() => {
+    const handleCapture = (keyString: string | null) => {
+        if (!capturingKeyFor) return;
+        handleConfigChange('mouse', capturingKeyFor, keyString, true);
+        setCapturingKeyFor(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.key === 'Escape') {
+            if (capturingKeyFor) {
+                // Restore to factory default for the specific key being captured.
+                const defaultValue = factoryDefaultMappings[capturingKeyFor.toLowerCase()];
+                return handleCapture(defaultValue ?? null);
+            }
+            return handleCapture(null); // Should not happen, but as a fallback.
+        }
+
+        const parts = [];
+        if (event.ctrlKey) parts.push('Control');
+        if (event.altKey) parts.push('Alt');
+        if (event.shiftKey) parts.push('Shift');
+        
+        // Use event.key for a consistent representation of the key
+        const keyName = event.key;
+        if (!['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
+            parts.push(keyName);
+        }
+        
+        // Only capture if there is a main key pressed, not just modifiers
+        if (parts.length > (event.ctrlKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0)) {
+            handleCapture(parts.join('+'));
+        }
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        let buttonName = null;
+        switch (event.button) {
+            case 0: buttonName = 'Left'; break;
+            case 1: buttonName = 'Middle'; break;
+            case 2: buttonName = 'Right'; break;
+        }
+
+        if (buttonName) {
+            handleCapture(buttonName);
+        }
+    };
+
+    const preventDefault = (e: Event) => e.preventDefault();
+
+    if (capturingKeyFor) {
+        window.addEventListener('keydown', handleKeyDown, true);
+        window.addEventListener('mousedown', handleMouseDown, true);
+        // Disable context menu while capturing to allow right-click capture
+        window.addEventListener('contextmenu', preventDefault, true);
+    } 
+
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown, true);
+        window.removeEventListener('mousedown', handleMouseDown, true);
+        window.removeEventListener('contextmenu', preventDefault, true);
+    };
+  }, [capturingKeyFor, handleConfigChange]);
+
+  useEffect(() => {
+    const unlistenStep = listen<string>('calibration-step', (event) => setCalibrationStep(event.payload));
+    const unlistenFinished = listen<boolean>('calibration-finished', (event) => {
+      if (magCalibrationStatus === 'calibrating') {
+        setMagCalibrationStatus(event.payload ? 'success' : 'failed');
+        invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
+      }
+    });
+
+    if (controllerConfig === null) {
+        invoke<ControllerConfig>('get_controller_config').then(setControllerConfig).catch(console.error);
+    }
+    if (mouseMapperConfig === null) {
+        invoke<MouseMapperConfig>('get_mouse_mapper_config').then(setMouseMapperConfig).catch(console.error);
+    }
+
+    return () => {
+      unlistenStep.then(f => f());
+      unlistenFinished.then(f => f());
+    };
+  }, [magCalibrationStatus]);
+
+  const handleStartMagCalibration = async () => {
+    try {
+      setMagCalibrationStatus('calibrating');
+      setCalibrationStep('请拿起控制器，在空中画8字形...');
+      await invoke('start_mag_calibration_wizard');
+    } catch (error) {
+      console.error('Failed to start mag calibration:', error);
+      setMagCalibrationStatus('failed');
+    }
+  };
+
+  const handleStartGyroCalibration = async () => {
+    setGyroCalibrationStatus('calibrating');
+    setCalibrationStep('请将控制器静置在平坦表面上...');
+    try {
+      await invoke('start_gyro_calibration');
+      setGyroCalibrationStatus('success');
+      invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
+    } catch (error) {
+      console.error('Failed to start gyro calibration:', error);
+      setGyroCalibrationStatus('failed');
+    }
   };
 
   const handleResetControllerConfig = async () => {
@@ -385,11 +463,16 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                     precision={1}
                 />
     
-              <h4 style={styles.subHeading4}>按键映射</h4>
+              <h4 style={styles.subHeading4}>按键映射 (单击以设置, Esc还原默认)</h4>
               {Object.entries(mouseMapperConfig.button_mapping).map(([key, value]) => (
-                <div style={styles.formGroup} key={key}>
-                  <label>{key}</label>
-                  <input type="text" value={value ?? ''} onBlur={(e) => handleConfigChange('mouse', key, e.target.value, true)} onChange={(e) => setMouseMapperConfig({...mouseMapperConfig, button_mapping: {...mouseMapperConfig.button_mapping, [key]: e.target.value || null}})} style={styles.input} />
+                <div style={styles.formGroupRow} key={key}>
+                  <label style={styles.keymapLabel}>{key}</label>
+                  <button 
+                    onClick={() => setCapturingKeyFor(key)}
+                    style={capturingKeyFor === key ? styles.keymapButtonCapturing : styles.keymapButton}
+                  >
+                    {capturingKeyFor === key ? '请按键或点击鼠标...' : (value || '无')}
+                  </button>
                 </div>
               ))}
             </div>
@@ -454,7 +537,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     vectorContainer: { display: 'flex', gap: '10px', backgroundColor: '#1e1e1e', padding: '10px', borderRadius: '4px' },
     vectorItem: { display: 'flex', gap: '5px', alignItems: 'center' },
     vectorLabel: { color: '#00ddb3', fontWeight: 'bold' },
-    // New styles for Slider and Switch
     sliderLabel: { display: 'flex', justifyContent: 'space-between', width: '100%', color: '#eee', fontSize: '1rem' },
     sliderValue: { color: '#00ffcc', fontWeight: 'bold' },
     slider: {
@@ -509,9 +591,39 @@ const styles: { [key: string]: React.CSSProperties } = {
     switchText: {
         fontWeight: 'bold',
         color: '#00ffcc',
-        width: '70px', // Allocate space
+        width: '70px',
         textAlign: 'center',
+    },
+    keymapLabel: {
+        color: '#eee',
+        fontSize: '1rem',
+    },
+    keymapButton: {
+        backgroundColor: '#333',
+        color: '#fff',
+        border: '1px solid #555',
+        padding: '8px 15px',
+        borderRadius: '5px',
+        fontSize: '1rem',
+        cursor: 'pointer',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
+        minWidth: '150px',
+        textAlign: 'center',
+    },
+    keymapButtonCapturing: {
+        backgroundColor: '#00ffcc',
+        color: '#1e1e1e',
+        border: '1px solid #00ffcc',
+        padding: '8px 15px',
+        borderRadius: '5px',
+        fontSize: '1rem',
+        cursor: 'pointer',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
+        minWidth: '150px',
+        textAlign: 'center',
+        fontWeight: 'bold',
     },
 };
 
 export default Settings;
+

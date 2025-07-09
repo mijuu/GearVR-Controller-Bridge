@@ -27,12 +27,12 @@ pub struct ButtonMapping {
 impl Default for ButtonMapping {
     fn default() -> Self {
         ButtonMapping {
-            trigger: Some("left".to_string()),   // Left mouse button by default
-            home: Some("esc".to_string()),       // Escape key by default
-            back: Some("backspace".to_string()), // Backspace key by default
-            volume_up: Some("volume_up".to_string()), // Volume up
-            volume_down: Some("volume_down".to_string()), // Volume down
-            touchpad: Some("right".to_string()), // Right mouse button by default
+            trigger: Some("Left".to_string()),   // Left mouse button by default
+            home: Some("".to_string()),       // Escape key by default
+            back: Some("Backspace".to_string()), // Backspace key by default
+            volume_up: Some("Volume up".to_string()), // Volume up
+            volume_down: Some("Volume down".to_string()), // Volume down
+            touchpad: Some("Right".to_string()), // Right mouse button by default
         }
     }
 }

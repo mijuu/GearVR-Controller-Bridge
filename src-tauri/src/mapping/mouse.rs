@@ -3,6 +3,7 @@ use log::{info, warn};
 use std::thread;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
+use tauri::AppHandle;
 
 use crate::config::mouse_mapper_config::MouseMapperConfig;
 use crate::core::controller::ControllerState;
@@ -20,12 +21,13 @@ pub struct MouseMapperSender {
 }
 
 impl MouseMapperSender {
-    pub fn new(config: MouseMapperConfig) -> Self {
+    pub fn new(app_handle: &AppHandle, config: MouseMapperConfig) -> Self {
         let (tx, mut rx) = mpsc::channel(32);
         let mouse_mapper_config = config.clone();
+        let app_handle_clone = app_handle.clone();
 
         thread::spawn(move || {
-            let mut mouse_mapper = MouseMapper::new(mouse_mapper_config);
+            let mut mouse_mapper = MouseMapper::new(app_handle_clone, mouse_mapper_config);
             info!("MouseMapper thread with interpolation started.");
 
             // 定义我们的平滑循环频率，例如 250Hz
@@ -72,11 +74,5 @@ impl MouseMapperSender {
         if let Err(e) = self.tx.send(MouseMapperCommand::UpdateConfig(config)).await {
             warn!("Failed to send config update to mouse mapper thread: {}", e);
         }
-    }
-}
-
-impl Default for MouseMapperSender {
-    fn default() -> Self {
-        Self::new(MouseMapperConfig::default())
     }
 }

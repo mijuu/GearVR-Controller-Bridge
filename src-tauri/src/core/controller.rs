@@ -1,6 +1,7 @@
 //! GearVR Controller data parsing and handling
 //! This module handles parsing and processing of data received from the GearVR controller.
 
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration};
 use std::path::Path;
@@ -383,7 +384,7 @@ impl ControllerParser {
             if delta_t <= 0.0 { 
                 // 时间戳没有前进，或者发生了回绕，这会导致 AHRS 异常
                 // 打印警告或使用一个默认的 delta_t，例如 initial_sample_period
-                eprintln!("Warning: Non-positive delta_t: {}. Using default sample_period.", delta_t);
+                warn!("Warning: Non-positive delta_t: {}. Using default sample_period.", delta_t);
                 delta_t = self.ahrs_filter.sample_period();
             }
         } else {
@@ -448,7 +449,7 @@ impl ControllerParser {
         if buttons.home {
             // 记录当前的 AHRS 四元数的逆
             self.last_zero_quaternion = Some(orientation.inverse()); // 记录未经过归零的 AHRS 输出的逆
-            eprintln!("Re-zeroed orientation!");
+            warn!("Re-zeroed orientation!");
         }
         if let Some(zero_q) = self.last_zero_quaternion {
             // 应用归零转换

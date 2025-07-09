@@ -1,8 +1,14 @@
 //! Mouse and keyboard mapping for GearVR controller
 //! This module maps controller inputs to mouse and keyboard actions using the enigo library.
 
-use enigo::{Enigo, KeyboardControllable, MouseButton, MouseControllable};
+use anyhow::{Ok, Result};
+use enigo::{
+    Button, Coordinate,
+    Direction::{Click, Press, Release},
+    Enigo, Key, Keyboard, Mouse, Settings,
+};
 use nalgebra::UnitQuaternion;
+use tauri::AppHandle; // Import AppHandle
 
 use crate::config::mouse_mapper_config::{MouseMapperConfig, MouseMode};
 use crate::core::controller::{ButtonState, ControllerState, TouchpadState};
@@ -11,6 +17,8 @@ use crate::core::controller::{ButtonState, ControllerState, TouchpadState};
 pub struct MouseMapper {
     /// Enigo instance for input simulation
     enigo: Enigo,
+    /// The Tauri app handle to run commands on the main thread
+    app_handle: AppHandle,
     /// Current configuration
     pub config: MouseMapperConfig,
     /// Last controller state
@@ -40,11 +48,12 @@ pub struct MouseMapper {
 
 impl MouseMapper {
     /// Creates a new mouse mapper with default configuration
-    pub fn new(config: MouseMapperConfig) -> Self {
-        let enigo = Enigo::new();
-        let (x, y) = enigo.mouse_location();
+    pub fn new(app_handle: AppHandle, config: MouseMapperConfig) -> Self {
+        let enigo = Enigo::new(&Settings::default()).unwrap();
+        let (x, y) = enigo.location().unwrap();
         Self {
             enigo,
+            app_handle,
             config,
             last_state: None,
             remainder_x: 0.0,
@@ -161,10 +170,14 @@ impl MouseMapper {
             if let Some(key) = key_map {
                 if is_pressed && !was_pressed {
                     // State changed from UP to DOWN: Press the key
-                    self.press_key(key);
+                    if let Err(e) = self.press_key(key) {
+                        eprintln!("Failed to press key '{}': {:?}", key, e);
+                    }
                 } else if !is_pressed && was_pressed {
                     // State changed from DOWN to UP: Release the key
-                    self.release_key(key);
+                    if let Err(e) = self.release_key(key) {
+                        eprintln!("Failed to release key '{}': {:?}", key, e);
+                    }
                 }
             }
         };
@@ -179,60 +192,111 @@ impl MouseMapper {
     }
 
     /// Presses a key or mouse button based on string identifier
-    fn press_key(&mut self, key: &str) {
+    fn press_key(&mut self, key: &str) -> Result<()> {
         eprintln!("Pressing key: {}", key);
         match key.to_lowercase().as_str() {
             // 鼠标按键
-            "left" => self.enigo.mouse_down(MouseButton::Left),
-            "right" => self.enigo.mouse_down(MouseButton::Right),
-            "middle" => self.enigo.mouse_down(MouseButton::Middle),
+            "left" => self.enigo.button(Button::Left, Press)?,
+            "right" => self.enigo.button(Button::Right, Press)?,
+            "middle" => self.enigo.button(Button::Middle, Press)?,
 
             // 特殊功能键
-            "esc" | "escape" => self.enigo.key_click(enigo::Key::Escape),
-            "backspace" => self.enigo.key_click(enigo::Key::Backspace),
+            "esc" | "escape" => self.enigo.key(Key::Escape, Press)?,
+            "backspace" => self.enigo.key(Key::Backspace, Press)?,
 
             // 多媒体键 (注意：这些键的可用性取决于操作系统和 enigo 的支持)
-            "volume_up" => self.enigo.key_click(enigo::Key::VolumeUp),
-            "volume_down" => self.enigo.key_click(enigo::Key::VolumeDown),
+            "volume up" => self.enigo.key(Key::VolumeUp, Press)?,
+            "volume down" => self.enigo.key(Key::VolumeDown, Press)?,
 
             // 其他常用键的示例
-            "enter" => self.enigo.key_click(enigo::Key::Return), // 或者 Key::Enter
-            "tab" => self.enigo.key_click(enigo::Key::Tab),
-            "space" => self.enigo.key_click(enigo::Key::Space),
-            "home" => self.enigo.key_click(enigo::Key::Home),
-            "end" => self.enigo.key_click(enigo::Key::End),
-            "pageup" => self.enigo.key_click(enigo::Key::PageUp),
-            "pagedown" => self.enigo.key_click(enigo::Key::PageDown),
-            "shift" => self.enigo.key_click(enigo::Key::Shift),
-            "ctrl" | "control" => self.enigo.key_click(enigo::Key::Control),
-            "alt" => self.enigo.key_click(enigo::Key::Alt),
+            "enter" => self.enigo.key(Key::Return, Press)?, // 或者 Key::Enter
+            "tab" => self.enigo.key(Key::Tab, Press)?,
+            "space" => self.enigo.key(Key::Space, Press)?,
+            "home" => self.enigo.key(Key::Home, Press)?,
+            "end" => self.enigo.key(Key::End, Press)?,
+            "pageup" => self.enigo.key(Key::PageUp, Press)?,
+            "pagedown" => self.enigo.key(Key::PageDown, Press)?,
+            "shift" => self.enigo.key(Key::Shift, Press)?,
+            "ctrl" | "control" => self.enigo.key(Key::Control, Press)?,
+            "alt" => self.enigo.key(Key::Alt, Press)?,
             // F1 到 F12
-            "f1" => self.enigo.key_click(enigo::Key::F1),
-            "f2" => self.enigo.key_click(enigo::Key::F2),
-            // ...以此类推...
-            "f12" => self.enigo.key_click(enigo::Key::F12),
+            "f1" => self.enigo.key(Key::F1, Press)?,
+            "f2" => self.enigo.key(Key::F2, Press)?,
+            "f3" => self.enigo.key(Key::F3, Press)?,
+            "f4" => self.enigo.key(Key::F4, Press)?,
+            "f5" => self.enigo.key(Key::F5, Press)?,
+            "f6" => self.enigo.key(Key::F6, Press)?,
+            "f7" => self.enigo.key(Key::F7, Press)?,
+            "f8" => self.enigo.key(Key::F8, Press)?,
+            "f9" => self.enigo.key(Key::F9, Press)?,
+            "f10" => self.enigo.key(Key::F10, Press)?,
+            "f11" => self.enigo.key(Key::F11, Press)?,
+            "f12" => self.enigo.key(Key::F12, Press)?,
 
             // 默认情况：处理单个字符
             // 只有当以上所有情况都不匹配时，才认为它是一个普通字符
             single_char_key => {
                 if let Some(c) = single_char_key.chars().next() {
-                    self.enigo.key_click(enigo::Key::Layout(c));
+                    eprintln!("Pressing character: {}", c);
+                    let app_handle = self.app_handle.clone();
+                    let key_char = c;
+                    let _ = app_handle.run_on_main_thread(move || {
+                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                        enigo.key(Key::Unicode(key_char), Press).unwrap()
+                    });
                 }
             }
         }
+        Ok(())
     }
 
     /// Releases a key or mouse button based on string identifier
-    fn release_key(&mut self, key: &str) {
-        // We only need to handle the release for mouse buttons that were pressed with mouse_down.
-        // Keyboard keys handled by key_click already include a release.
+    fn release_key(&mut self, key: &str) -> Result<()> {
         match key.to_lowercase().as_str() {
-            "left" => self.enigo.mouse_up(MouseButton::Left),
-            "right" => self.enigo.mouse_up(MouseButton::Right),
-            "middle" => self.enigo.mouse_up(MouseButton::Middle),
-            // For all other keys, do nothing on release.
-            _ => {}
+            "left" => self.enigo.button(Button::Left, Release)?,
+            "right" => self.enigo.button(Button::Right, Release)?,
+            "middle" => self.enigo.button(Button::Middle, Release)?,
+
+            // Keyboard keys
+            "esc" | "escape" => self.enigo.key(Key::Escape, Release)?,
+            "backspace" => self.enigo.key(Key::Backspace, Release)?,
+            "volume up" => self.enigo.key(Key::VolumeUp, Release)?,
+            "volume down" => self.enigo.key(Key::VolumeDown, Release)?,
+            "enter" => self.enigo.key(Key::Return, Release)?,
+            "tab" => self.enigo.key(Key::Tab, Release)?,
+            "space" => self.enigo.key(Key::Space, Release)?,
+            "home" => self.enigo.key(Key::Home, Release)?,
+            "end" => self.enigo.key(Key::End, Release)?,
+            "pageup" => self.enigo.key(Key::PageUp, Release)?,
+            "pagedown" => self.enigo.key(Key::PageDown, Release)?,
+            "shift" => self.enigo.key(Key::Shift, Release)?,
+            "ctrl" | "control" => self.enigo.key(Key::Control, Release)?,
+            "alt" => self.enigo.key(Key::Alt, Release)?,
+            "f1" => self.enigo.key(Key::F1, Release)?,
+            "f2" => self.enigo.key(Key::F2, Release)?,
+            "f3" => self.enigo.key(Key::F3, Release)?,
+            "f4" => self.enigo.key(Key::F4, Release)?,
+            "f5" => self.enigo.key(Key::F5, Release)?,
+            "f6" => self.enigo.key(Key::F6, Release)?,
+            "f7" => self.enigo.key(Key::F7, Release)?,
+            "f8" => self.enigo.key(Key::F8, Release)?,
+            "f9" => self.enigo.key(Key::F9, Release)?,
+            "f10" => self.enigo.key(Key::F10, Release)?,
+            "f11" => self.enigo.key(Key::F11, Release)?,
+            "f12" => self.enigo.key(Key::F12, Release)?,
+            single_char_key => {
+                if let Some(c) = single_char_key.chars().next() {
+                    let app_handle = self.app_handle.clone();
+                    let key_char = c;
+                    let _ = app_handle.run_on_main_thread(move || {
+                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                        enigo.key(Key::Unicode(key_char), Release).unwrap()
+                    });
+                }
+            }
         }
+
+        Ok(())
     }
 
     /// Handles mouse movement in air mouse mode.
@@ -260,12 +324,12 @@ impl MouseMapper {
             self.precision_mode_center_pitch = vertical_deg;
 
             // Set the current mouse position as the starting point for relative movement.
-            let (x, y) = self.enigo.mouse_location();
+            let (x, y) = self.enigo.location().unwrap();
             self.precision_mode_start_x = x;
             self.precision_mode_start_y = y;
         }
 
-        let (screen_width, screen_height) = self.enigo.main_display_size();
+        let (screen_width, screen_height) = self.enigo.main_display().unwrap();
 
         if is_precision_mode_active {
             // --- Precision Mode: Relative movement based on the initial state ---
@@ -349,7 +413,7 @@ impl MouseMapper {
                 let target_x = self.target_screen_x + final_dx;
                 let target_y = self.target_screen_y + final_dy;
 
-                let (screen_width, screen_height) = self.enigo.main_display_size();
+                let (screen_width, screen_height) = self.enigo.main_display().unwrap();
                 self.target_screen_x = target_x.clamp(0, screen_width as i32 - 1);
                 self.target_screen_y = target_y.clamp(0, screen_height as i32 - 1);
             }
@@ -361,7 +425,7 @@ impl MouseMapper {
     pub fn interpolate_tick(&mut self) {
         // If no input is active, sync the target position with the actual mouse position.
         if !self.is_precision_mode_active && !self.is_air_mouse_active {
-            let (current_x, current_y) = self.enigo.mouse_location();
+            let (current_x, current_y) = self.enigo.location().unwrap();
             self.target_screen_x = current_x;
             self.target_screen_y = current_y;
 
@@ -372,15 +436,19 @@ impl MouseMapper {
             return;
         }
 
-        let (current_x, current_y) = self.enigo.mouse_location();
+        let (current_x, current_y) = self.enigo.location().unwrap();
         let dx = self.target_screen_x - current_x;
         let dy = self.target_screen_y - current_y;
 
         // If the distance is negligible, snap to the target to prevent jitter.
         if dx.abs() < 1 && dy.abs() < 1 {
             if current_x != self.target_screen_x || current_y != self.target_screen_y {
-                self.enigo
-                    .mouse_move_to(self.target_screen_x, self.target_screen_y);
+                if let Err(e) = self
+                    .enigo
+                    .move_mouse(self.target_screen_x, self.target_screen_y, Coordinate::Abs)
+                {
+                    eprintln!("Failed to move mouse to target position: {:?}", e);
+                }
             }
             return;
         }
@@ -390,13 +458,8 @@ impl MouseMapper {
         let new_x = current_x + (dx as f32 * SMOOTHING_FACTOR) as i32;
         let new_y = current_y + (dy as f32 * SMOOTHING_FACTOR) as i32;
 
-        self.enigo.mouse_move_to(new_x, new_y);
+        if let Err(e) = self.enigo.move_mouse(new_x, new_y, Coordinate::Abs) {
+            eprintln!("Failed to move mouse to target position: {:?}", e);
+        }
     }
 }
-
-impl Default for MouseMapper {
-    fn default() -> Self {
-        Self::new(MouseMapperConfig::default())
-    }
-}
-

@@ -4,12 +4,12 @@
 use std::sync::{Arc};
 use tokio::sync::{Mutex};
 use anyhow::{Result};
+use tauri::AppHandle;
 use log::{info};
 use crate::core::BluetoothManager;
 use crate::mapping::mouse::MouseMapperSender;
 use crate::config::controller_config::ControllerConfig;
 use crate::config::mouse_mapper_config::MouseMapperConfig;
-use tauri::AppHandle;
 
 /// Global application state
 pub struct AppState {
@@ -27,7 +27,7 @@ impl AppState {
         let initial_mouse_mapper_config = MouseMapperConfig::load_config(app_handle).await.ok();
 
         let bluetooth_manager = BluetoothManager::new(initial_controller_config.unwrap_or_default()).await?;
-        let mouse_sender = MouseMapperSender::new(initial_mouse_mapper_config.unwrap_or_default());
+        let mouse_sender = MouseMapperSender::new(app_handle, initial_mouse_mapper_config.unwrap_or_default());
         Ok(Self {
             bluetooth_manager: Arc::new(Mutex::new(bluetooth_manager)),
             mouse_sender: Arc::new(Mutex::new(mouse_sender)),
