@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from "@react-three/fiber";
@@ -27,58 +27,26 @@ export interface ControllerState {
     temperature: number;
 }
 
-export default function ControllerStatus() {
+interface ControllerViewProps {
+    isConnected: boolean;
+}
+
+export default function ControllerStatus({ isConnected }: ControllerViewProps) {
     const [state, setState] = useState<ControllerState | null>(null);
     const [battery_level, setBatteryLevel] = useState<number | null>(null);
-    const [isConnected, setIsConnected] = useState(true);
-    const reconnectTimeoutRef = useRef<any>(null);
 
     // Effect for listeners
     useEffect(() => {
-        const stopReconnecting = () => {
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-                reconnectTimeoutRef.current = null;
-            }
-        };
-
         const setupListeners = async () => {
             const unlistenState = await listen<ControllerState>(
                 "controller-state",
                 (event) => {
-                    setIsConnected(true);
-                    stopReconnecting();
                     setState(event.payload);
                 }
             );
 
-            const unlistenLostConnection = await listen<void>('device-lost-connection', () => {
-                setIsConnected(false);
-                setBatteryLevel(null); // Battery level is uncertain
-
-                stopReconnecting(); // Clear any previous loop
-
-                const tryReconnect = async () => {
-                    console.log("Attempting to reconnect to the device...");
-                    try {
-                        await invoke('reconnect_to_device');
-                        // On success, the 'controller-state' event should fire,
-                        // which will call stopReconnecting() and break the loop.
-                    } catch (err) {
-                        console.error("Reconnect attempt failed:", err);
-                        // If the attempt fails, schedule the next one.
-                        // The timeout will be cancelled by stopReconnecting if a connection is established.
-                        reconnectTimeoutRef.current = setTimeout(tryReconnect, 3000);
-                    }
-                };
-
-                // Start the first attempt.
-                tryReconnect();
-            });
-
             return () => {
                 unlistenState();
-                unlistenLostConnection();
             };
         };
 
@@ -86,13 +54,15 @@ export default function ControllerStatus() {
 
         return () => {
             unlistenPromise.then(unlisten => unlisten && unlisten());
-            stopReconnecting();
         };
     }, []); // Empty dependency array, runs only once.
 
     // Effect for polling battery level
     useEffect(() => {
-        if (!isConnected) return;
+        if (!isConnected) {
+            setBatteryLevel(null); // Clear battery level on disconnect
+            return;
+        }
 
         const updateBatteryLevel = async () => {
             try {
@@ -117,16 +87,6 @@ export default function ControllerStatus() {
 
     return (
         <div className="controller-status">
-            {!isConnected && (
-                <div className="connection-lost-overlay">
-                    <div className="connection-lost-toast">
-                        <h2>连接丢失</h2>
-                        <p>正在尝试重新连接，请按键任意键唤醒您的控制器。</p>
-                        {/* <p>如果长时间无响应，您可以点击<span className="rescan-link" onClick={handleRescanClick}>重新扫描</span>查找设备。</p> */}
-                    </div>
-                </div>
-            )}
-
             {state && (
                 <>
                     <div className="top-section">

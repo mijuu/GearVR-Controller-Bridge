@@ -14,6 +14,7 @@ export type AppView = 'controller' | 'settings';
 function App() {
   // 状态管理
   const [isConnected, setIsConnected] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [connectedDevice, setConnectedDevice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,8 @@ function App() {
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const logListenerRef = useRef<(() => void) | null>(null);
   const [activeView, setActiveView] = useState<AppView>('controller');
+
+  const reconnectTimeoutRef = useRef<any>(null);
 
   // 清除日志的函数
   const clearLogs = () => {
@@ -38,6 +41,7 @@ function App() {
         if (status.is_connected) {
           setIsConnected(true);
           setConnectedDevice(status.device_name);
+          setSessionActive(true);
         }
       } catch (err) {
         console.error("Failed to check initial connection status:", err);
@@ -50,12 +54,44 @@ function App() {
 
   // 监听连接状态变化
   useEffect(() => {
+    const stopReconnecting = () => {
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+    };
+
     const unlistenConnect = listen("device-connected", (event) => {
       const deviceName = (event.payload as { name?: string })?.name;
       setIsConnected(true);
+      setSessionActive(true);
       setConnectedDevice(deviceName || null);
       setError(null);
       setActiveView('controller'); // Switch to controller view on connect
+      stopReconnecting();
+    });
+
+    const unlistenLostConnection = listen("device-lost-connection", () => {
+      setIsConnected(false);
+      setConnectedDevice(null);
+      
+      stopReconnecting(); // Clear any previous loop
+
+      const tryReconnect = async () => {
+          console.log("Attempting to reconnect to the device...");
+          try {
+              await invoke('reconnect_to_device');
+              // On success, the 'device-connected' event will fire,
+              // which will call stopReconnecting() and break the loop.
+          } catch (err) {
+              console.error("Reconnect attempt failed:", err);
+              // If the attempt fails, schedule the next one.
+              reconnectTimeoutRef.current = setTimeout(tryReconnect, 3000);
+          }
+      };
+
+      // Start the first attempt.
+      tryReconnect();
     });
 
     const unlistenError = listen("device-error", (event) => {
@@ -65,7 +101,9 @@ function App() {
 
     return () => {
       unlistenConnect.then(unlisten => unlisten());
+      unlistenLostConnection.then(unlisten => unlisten());
       unlistenError.then(unlisten => unlisten());
+      stopReconnecting();
     };
   }, []);
 
@@ -129,7 +167,7 @@ function App() {
       return;
     }
 
-    if (!isConnected) {
+    if (!sessionActive) {
       return <MainView />;
     }
 
@@ -138,7 +176,7 @@ function App() {
         return <Settings onBack={() => setActiveView('controller')} />;
       case 'controller':
       default:
-        return <ControllerView />;
+        return <ControllerView isConnected={isConnected} />;
     }
   };
 
@@ -151,6 +189,14 @@ function App() {
 
       <main className="app-content">
         {renderContent()}
+        {sessionActive && !isConnected && (
+            <div className="connection-lost-overlay">
+                <div className="connection-lost-toast">
+                    <h2>连接丢失</h2>
+                    <p>正在尝试重新连接，请按键任意键唤醒您的控制器。</p>
+                </div>
+            </div>
+        )}
         {showLogs && (
           <div className="log-overlay">
             <LogViewer logs={logs} onClearLogs={clearLogs} />
