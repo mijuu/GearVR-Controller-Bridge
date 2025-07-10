@@ -245,8 +245,6 @@ impl BluetoothManager {
         if !device.is_connected().await {
             info!("Device {:?} is not connected. Skipping battery level retrieval.", device.id());
             
-            let window_clone = window.clone();
-            self.reconnect_device(window_clone).await.unwrap();
             if let Err(e) = window.emit("device-lost-connection", ()) {
                 error!("Failed to emit device-lost-connection event: {}", e);
             }

@@ -92,6 +92,17 @@ pub async fn connect_to_device(
 }
 
 #[tauri::command]
+pub async fn reconnect_to_device(
+    window: Window,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+    
+    bluetooth_manager_guard.reconnect_device(window).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_battery_level(
     window: Window,
     app_state: State<'_, AppState>,
@@ -115,17 +126,6 @@ pub async fn disconnect(app_state: State<'_, AppState>) -> Result<(), String> {
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     
     bluetooth_manager_guard.disconnect().await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn reconnect_to_device(
-    window: Window,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
-    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
-    let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.reconnect_device(window).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

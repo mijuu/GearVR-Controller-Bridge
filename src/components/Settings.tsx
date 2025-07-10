@@ -179,6 +179,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>('calibration');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [capturingKeyFor, setCapturingKeyFor] = useState<string | null>(null);
+  const [hoveredReset, setHoveredReset] = useState<string | null>(null);
 
   const factoryDefaultMappings: { [key: string]: string | null } = {
     trigger: 'Left',
@@ -407,7 +408,6 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
                     <h3 style={styles.subHeading}>控制器设置</h3>
-                    <button onClick={handleResetControllerConfig} style={styles.resetButton}>重置</button>
                 </div>
                 <Slider
                     label="传感器低通滤波 (alpha)"
@@ -444,6 +444,16 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     onAfterChange={() => handleControllerConfigChange('local_earth_mag_field', controllerConfig.local_earth_mag_field)}
                     precision={0}
                 />
+                <div style={styles.resetButtonContainer}>
+                    <button 
+                        onClick={handleResetControllerConfig} 
+                        style={hoveredReset === 'controller' ? { ...styles.resetButton, ...styles.resetButtonHover } : styles.resetButton}
+                        onMouseEnter={() => setHoveredReset('controller')}
+                        onMouseLeave={() => setHoveredReset(null)}
+                    >
+                        恢复默认设置
+                    </button>
+                </div>
             </div>
           );
       case 'mouse':
@@ -451,7 +461,6 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
                     <h3 style={styles.subHeading}>鼠标设置</h3>
-                    <button onClick={handleResetMouseConfig} style={styles.resetButton}>重置</button>
                 </div>
                 <Switch
                     label="启用AirMouse (双击Home快捷开启)"
@@ -493,6 +502,16 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     onAfterChange={() => handleMouseConfigChange('air_mouse_activation_threshold', mouseConfig.air_mouse_activation_threshold)}
                     precision={1}
                 />
+                <div style={styles.resetButtonContainer}>
+                    <button 
+                        onClick={handleResetMouseConfig} 
+                        style={hoveredReset === 'mouse' ? { ...styles.resetButton, ...styles.resetButtonHover } : styles.resetButton}
+                        onMouseEnter={() => setHoveredReset('mouse')}
+                        onMouseLeave={() => setHoveredReset(null)}
+                    >
+                        恢复默认设置
+                    </button>
+                </div>
             </div>
           );
       case 'keymap':
@@ -500,7 +519,6 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
                     <h3 style={styles.subHeading}>按键映射</h3>
-                    <button onClick={handleResetKeymapConfig} style={styles.resetButton}>重置</button>
                 </div>
                 <h4 style={styles.subHeading4}>按键映射 (单击以设置, Esc还原默认)</h4>
                 {Object.entries(keymapConfig).map(([key, value]) => (
@@ -514,6 +532,16 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   </button>
                 </div>
               ))}
+              <div style={styles.resetButtonContainer}>
+                  <button 
+                    onClick={handleResetKeymapConfig} 
+                    style={hoveredReset === 'keymap' ? { ...styles.resetButton, ...styles.resetButtonHover } : styles.resetButton}
+                    onMouseEnter={() => setHoveredReset('keymap')}
+                    onMouseLeave={() => setHoveredReset(null)}
+                  >
+                    恢复默认设置
+                  </button>
+              </div>
             </div>
         );
       default:
@@ -552,7 +580,27 @@ const styles: { [key: string]: React.CSSProperties } = {
     section: { padding: '0', borderRadius: '0', boxShadow: 'none', backgroundColor: 'transparent' },
     subHeadingContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '52px', marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '15px' },
     subHeading: { fontSize: '1.8rem', color: '#00ffcc', textAlign: 'left', borderBottom: 'none', paddingBottom: '0', margin: 0 },
-    resetButton: { backgroundColor: '#dc3545', color: '#ffffff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontSize: '0.9rem', cursor: 'pointer', transition: 'background-color 0.3s ease', fontWeight: 'bold' },
+    resetButton: {
+        backgroundColor: '#dc3545',
+        color: '#ffffff',
+        border: 'none',
+        padding: '8px 15px',
+        borderRadius: '5px',
+        fontSize: '0.9rem',
+        cursor: 'pointer',
+        transition: 'background-color 0.3s ease',
+        fontWeight: 'bold',
+    },
+    resetButtonHover: {
+        backgroundColor: '#c82333'
+    },
+    resetButtonContainer: {
+        borderTop: '1px solid #444',
+        marginTop: '20px',
+        paddingTop: '20px',
+        display: 'flex',
+        justifyContent: 'flex-end',
+    },
     subHeading4: { fontSize: '1.2rem', marginTop: '20px', marginBottom: '10px', color: '#00ddb3' },
     cardsContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
     card: { backgroundColor: '#333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' },

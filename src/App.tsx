@@ -58,11 +58,6 @@ function App() {
       setActiveView('controller'); // Switch to controller view on connect
     });
 
-    const unlistenDisconnect = listen("device-lost-connection", () => {
-      setIsConnected(false);
-      setConnectedDevice(null);
-    });
-
     const unlistenError = listen("device-error", (event) => {
       const errorMessage = (event.payload as { message: string }).message;
       setError(errorMessage);
@@ -70,7 +65,6 @@ function App() {
 
     return () => {
       unlistenConnect.then(unlisten => unlisten());
-      unlistenDisconnect.then(unlisten => unlisten());
       unlistenError.then(unlisten => unlisten());
     };
   }, []);
@@ -132,7 +126,7 @@ function App() {
 
   const renderContent = () => {
     if (isCheckingConnection) {
-      return <div style={{ textAlign: 'center', paddingTop: '4rem', color: '#888' }}>检查连接状态...</div>;
+      return;
     }
 
     if (!isConnected) {

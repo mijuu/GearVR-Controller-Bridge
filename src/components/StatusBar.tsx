@@ -10,6 +10,12 @@ interface StatusBarProps {
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs, onViewChange }) => {
+  const handleSettingsClick = () => {
+    if (isConnected) {
+      onViewChange('settings');
+    }
+  };
+
   return (
     <div className="status-bar">
       <div className="status-left">
@@ -31,8 +37,8 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           {showLogs ? '隐藏日志' : '显示日志'}
         </div>
         <div 
-          className="settings-link" 
-          onClick={() => onViewChange('settings')}
+          className={`settings-link ${!isConnected ? 'disabled' : ''}`}
+          onClick={handleSettingsClick}
           style={{ marginLeft: '1rem' }}
         >
           设置
@@ -103,8 +109,13 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           user-select: none;
         }
 
-        .log-toggle-link:hover, .settings-link:hover {
+        .log-toggle-link:hover, .settings-link:not(.disabled):hover {
           text-decoration: underline;
+        }
+
+        .settings-link.disabled {
+          color: #444;
+          cursor: not-allowed;
         }
       `}</style>
     </div>
