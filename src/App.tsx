@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import MainView from "./components/MainView";
 import StatusBar from "./components/StatusBar";
 import LogViewer from "./components/LogViewer";
@@ -8,56 +9,65 @@ import Settings from "./components/Settings";
 import { LogMessage } from "./components/LogViewer";
 import "./App.css";
 
-type AppView = 'main' | 'controller' | 'settings';
+export type AppView = 'controller' | 'settings';
 
 function App() {
   // 状态管理
   const [isConnected, setIsConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [connectedDevice, setConnectedDevice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showLogs, setShowLogs] = useState(false); // 控制日志视图的显示/隐藏
-  const [logs, setLogs] = useState<LogMessage[]>([]); // 日志状态
+  const [showLogs, setShowLogs] = useState(false);
+  const [logs, setLogs] = useState<LogMessage[]>([]);
   const logListenerRef = useRef<(() => void) | null>(null);
-  const [currentView, setCurrentView] = useState<AppView>('main'); // 新增：当前视图状态
+  const [activeView, setActiveView] = useState<AppView>('controller');
 
   // 清除日志的函数
   const clearLogs = () => {
     setLogs([]);
   };
 
-  // 处理控制器连接成功，切换到控制器状态视图
-  const handleControllerConnected = () => {
-    setCurrentView('controller');
-  };
-
-  // 处理视图切换
-  const handleViewChange = (view: AppView) => {
-    setCurrentView(view);
-  };
+  // Check initial connection status on mount
+  useEffect(() => {
+    const checkInitialConnection = async () => {
+      setIsCheckingConnection(true);
+      try {
+        // NOTE: This requires a backend command `get_connection_status` that returns
+        // an object: { is_connected: boolean, device_name: string | null }
+        const status = await invoke<{ is_connected: boolean, device_name: string | null }>('get_connection_status');
+        if (status.is_connected) {
+          setIsConnected(true);
+          setConnectedDevice(status.device_name);
+        }
+      } catch (err) {
+        console.error("Failed to check initial connection status:", err);
+      } finally {
+        setIsCheckingConnection(false);
+      }
+    };
+    checkInitialConnection();
+  }, []);
 
   // 监听连接状态变化
   useEffect(() => {
-    // 监听连接成功事件
     const unlistenConnect = listen("device-connected", (event) => {
       const deviceName = (event.payload as { name?: string })?.name;
       setIsConnected(true);
       setConnectedDevice(deviceName || null);
       setError(null);
+      setActiveView('controller'); // Switch to controller view on connect
     });
 
-    // 监听断开连接事件
-    const unlistenDisconnect = listen("device-disconnected", () => {
+    const unlistenDisconnect = listen("device-lost-connection", () => {
       setIsConnected(false);
       setConnectedDevice(null);
     });
 
-    // 监听错误事件
     const unlistenError = listen("device-error", (event) => {
       const errorMessage = (event.payload as { message: string }).message;
       setError(errorMessage);
     });
 
-    // 清理监听器
     return () => {
       unlistenConnect.then(unlisten => unlisten());
       unlistenDisconnect.then(unlisten => unlisten());
@@ -120,6 +130,24 @@ function App() {
     };
   }, []);
 
+  const renderContent = () => {
+    if (isCheckingConnection) {
+      return <div style={{ textAlign: 'center', paddingTop: '4rem', color: '#888' }}>检查连接状态...</div>;
+    }
+
+    if (!isConnected) {
+      return <MainView />;
+    }
+
+    switch (activeView) {
+      case 'settings':
+        return <Settings onBack={() => setActiveView('controller')} />;
+      case 'controller':
+      default:
+        return <ControllerView />;
+    }
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -128,9 +156,7 @@ function App() {
       </header>
 
       <main className="app-content">
-        {currentView === 'main' && <MainView onControllerConnected={handleControllerConnected} />}
-        {currentView === 'controller' && <ControllerView />}
-        {currentView === 'settings' && <Settings onBackToController={handleViewChange} />}
+        {renderContent()}
         {showLogs && (
           <div className="log-overlay">
             <LogViewer logs={logs} onClearLogs={clearLogs} />
@@ -144,7 +170,7 @@ function App() {
           deviceName={connectedDevice || undefined}
           showLogs={showLogs}
           setShowLogs={setShowLogs}
-          onViewChange={handleViewChange}
+          onViewChange={(view) => setActiveView(view)}
         />
       </footer>
 

@@ -45,7 +45,7 @@ interface KeymapConfig {
 }
 
 interface SettingsProps {
-  onBackToController: (view: 'controller') => void;
+  onBack: () => void;
 }
 
 type ActiveMenu = 'calibration' | 'controller' | 'mouse' | 'keymap';
@@ -169,7 +169,7 @@ const VectorDisplay: React.FC<{ vector: Vector3, labels?: [string, string, strin
 );
 
 // --- Main Settings Component ---
-const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
+const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [magCalibrationStatus, setMagCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [gyroCalibrationStatus, setGyroCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [calibrationStep, setCalibrationStep] = useState('');
@@ -530,7 +530,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToController }) => {
                 <button style={activeMenu === 'controller' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('controller')}>控制器设置</button>
                 <button style={activeMenu === 'mouse' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('mouse')}>鼠标设置</button>
                 <button style={activeMenu === 'keymap' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('keymap')}>按键映射</button>
-                <button style={{...styles.menuButton, marginTop: 'auto'}} onClick={() => onBackToController('controller')}>← 返回控制器界面</button>
+                <button style={{...styles.menuButton, marginTop: 'auto'}} onClick={onBack}>← 返回</button>
             </div>
             <div style={styles.rightContent}>
                 {renderContent()}

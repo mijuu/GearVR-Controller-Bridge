@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { ControllerState } from './ControllerView/ControllerView';
 
 interface BluetoothDevice {
   name: string;
@@ -11,11 +10,7 @@ interface BluetoothDevice {
   is_connected: boolean;
 }
 
-interface MainViewProps {
-  onControllerConnected: () => void;
-}
-
-const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
+const MainView: React.FC = () => {
   const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected' | 'failed'>('searching');
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +22,38 @@ const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
     exit: { y: -20, opacity: 0 }
   };
 
+  const searchDevices = useCallback(async () => {
+    try {
+      setStatus('searching');        
+      setError(null);
+      await invoke('start_scan');
+    } catch (err) {
+      console.error('scan', err);
+      setError(`搜索失败: ${err}`);
+    }
+  }, []);
+  
+  const connectToDevice = useCallback(async (deviceId: string) => {
+    try {
+      setStatus('connecting');
+      setError(null);
+      await invoke('connect_to_device', { deviceId });
+    } catch (err) {
+      const errorMessage = typeof err === 'string' ? err 
+                        : err instanceof Error ? err.message
+                        : '未知错误';
+      
+      if (errorMessage.includes('Peer removed pairing information')) {
+        setError('检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接');
+      } else if (errorMessage.includes('the Bluetooth device isn\'t connected: unreachable')) {
+        setError('检查到设备已被重置，请在系统设置中关闭/打开蓝牙后，重新尝试连接')
+      } else {
+        setError(`连接失败: ${errorMessage}`);
+      }
+      setStatus('failed');
+    }
+  }, []);
+
   // Start device search on mount
   useEffect(() => {    
     // Listen for device found event
@@ -36,7 +63,6 @@ const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
         return;
       }
       
-
       const newDevice = event.payload;
       setDevice(newDevice);
       setStatus('found');
@@ -55,22 +81,11 @@ const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
       }, 1500);
     });
 
-    const payloadUnlisten = listen<ControllerState>("controller-state", (event) => {   
-      if (event.payload) {
-        setStatus('connected');
-        setTimeout(() => {
-          onControllerConnected(); // Call the callback
-        }, 1500);
-      }
-    });
-
     const lostUnlisten = listen<{id: string}>('device-lost-connection', () => {
       setStatus('failed');
       setDevice(null);
       setError('设备已断开连接');
     });
-
-    // Stop scanning when component unmounts
 
     searchDevices();
 
@@ -80,42 +95,9 @@ const MainView: React.FC<MainViewProps> = ({ onControllerConnected }) => {
 
       deviceFoundUnlisten.then(f => f());
       connectUnlisten.then(f => f());
-      payloadUnlisten.then(f => f());
       lostUnlisten.then(f => f());
     };
-  }, []);
-  
-  const searchDevices = async () => {
-    try {
-      setStatus('searching');        
-      setError(null);
-      await invoke('start_scan');
-    } catch (err) {
-      console.error('scan', err);
-      setError(`搜索失败: ${err}`);
-    }
-  };
-  
-  const connectToDevice = async (deviceId: string) => {
-    try {
-      setStatus('connecting');
-      setError(null);
-      await invoke('connect_to_device', { deviceId });
-    } catch (err) {
-      const errorMessage = typeof err === 'string' ? err 
-                        : err instanceof Error ? err.message
-                        : '未知错误';
-      
-      if (errorMessage.includes('Peer removed pairing information')) {
-        setError('检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接');
-      } else if (errorMessage.includes('the Bluetooth device isn\'t connected: unreachable')) {
-        setError('检查到设备已被重置，请在系统设置中选择删除此设备后，重新尝试连接')
-      } else {
-        setError(`连接失败: ${errorMessage}`);
-      }
-      setStatus('failed');
-    }
-  };
+  }, [searchDevices, connectToDevice]);
 
   return (
     <div className="main-view" style={{

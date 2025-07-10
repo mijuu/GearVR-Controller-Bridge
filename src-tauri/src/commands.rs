@@ -9,6 +9,33 @@ use anyhow::{Result};
 use tauri::{AppHandle, State, Window};
 use log::{error};
 
+#[derive(Clone, serde::Serialize)]
+pub struct ConnectionStatus {
+    is_connected: bool,
+    device_name: Option<String>,
+}
+
+/// Gets the current connection status.
+#[tauri::command]
+pub async fn get_connection_status(
+    app_state: State<'_, AppState>,
+) -> Result<ConnectionStatus, String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    let is_connected = bluetooth_manager_guard.is_connected().await;
+    let device_name = if is_connected {
+        bluetooth_manager_guard.get_connected_device_name().await
+    } else {
+        None
+    };
+
+    Ok(ConnectionStatus {
+        is_connected,
+        device_name,
+    })
+}
+
 /// Scans for Bluetooth devices with real-time updates through events
 ///
 /// # Arguments
@@ -327,7 +354,8 @@ macro_rules! export_commands {
             $crate::commands::reset_mouse_config,
             $crate::commands::get_keymap_config,
             $crate::commands::set_keymap_config,
-            $crate::commands::reset_keymap_config
+            $crate::commands::reset_keymap_config,
+            $crate::commands::get_connection_status
         ]
     };
 }

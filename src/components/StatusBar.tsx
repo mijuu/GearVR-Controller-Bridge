@@ -1,11 +1,12 @@
 import React from 'react';
+import { AppView } from '../App';
 
 interface StatusBarProps {
   isConnected: boolean;
   deviceName?: string;
   showLogs: boolean;
   setShowLogs: (show: boolean) => void;
-  onViewChange: (view: 'main' | 'controller' | 'settings') => void;
+  onViewChange: (view: AppView) => void;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs, onViewChange }) => {

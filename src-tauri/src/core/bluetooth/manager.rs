@@ -188,12 +188,37 @@ impl BluetoothManager {
         Ok(())
     }
 
+    /// Checks if a device is currently connected.
+    pub async fn is_connected(&self) -> bool {
+        let guard = self.connected_state.lock().await;
+        if let Some(state) = guard.as_ref() {
+            state.device.is_connected().await
+        } else {
+            false
+        }
+    }
+
     /// Returns the ID of the currently connected device
     pub async fn get_connected_device_id(&self) -> Option<String> {
     let connected_state_guard = self.connected_state.lock().await;
     connected_state_guard
         .as_ref()
         .map(|state| state.device.id().to_string())
+    }
+
+    /// Returns the name of the currently connected device.
+    pub async fn get_connected_device_name(&self) -> Option<String> {
+        let guard = self.connected_state.lock().await;
+        if let Some(state) = guard.as_ref() {
+            let device = state.device.clone();
+            drop(guard);
+            match device.name() {
+                Ok(name) => Some(name),
+                Err(_) => None,
+            }
+        } else {
+            None
+        }
     }
 
     /// turn off the controller
