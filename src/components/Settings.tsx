@@ -254,13 +254,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         if (event.ctrlKey) parts.push('Control');
         if (event.altKey) parts.push('Alt');
         if (event.shiftKey) parts.push('Shift');
+        if (event.metaKey) parts.push('Meta');
         
         const keyName = event.key;
         if (!['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
             parts.push(keyName);
         }
         
-        if (parts.length > (event.ctrlKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0)) {
+        if (parts.length > (event.ctrlKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0) + (event.metaKey ? 1 : 0)) {
             handleCapture(parts.join('+'));
         }
     };

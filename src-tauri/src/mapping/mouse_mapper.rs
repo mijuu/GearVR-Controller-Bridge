@@ -3,7 +3,7 @@
 
 use anyhow::{Ok, Result};
 use enigo::{
-    Button, Coordinate,
+    Button, Coordinate, Direction,
     Direction::{Click, Press, Release},
     Enigo, Key, Keyboard, Mouse, Settings,
 };
@@ -195,111 +195,148 @@ impl MouseMapper {
         process_change(current.touchpad, last.touchpad, &mapping.touchpad);
     }
 
-    /// Presses a key or mouse button based on string identifier
-    fn press_key(&mut self, key: &str) -> Result<()> {
-        eprintln!("Pressing key: {}", key);
+    /// Determines if a key string is a modifier key.
+    fn is_modifier(key: &str) -> bool {
+        matches!(
+            key.to_lowercase().as_str(),
+            "ctrl" | "control" | "shift" | "alt" | "meta" | "win" | "command"
+        )
+    }
+
+    /// Converts a key string to an `enigo::Key`.
+    fn string_to_key(key: &str) -> Option<Key> {
         match key.to_lowercase().as_str() {
-            // 鼠标按键
-            "left" => self.enigo.button(Button::Left, Press)?,
-            "right" => self.enigo.button(Button::Right, Press)?,
-            "middle" => self.enigo.button(Button::Middle, Press)?,
+            "esc" | "escape" => Some(Key::Escape),
+            "backspace" => Some(Key::Backspace),
+            "volume up" => Some(Key::VolumeUp),
+            "volume down" => Some(Key::VolumeDown),
+            "enter" => Some(Key::Return),
+            "tab" => Some(Key::Tab),
+            "space" => Some(Key::Space),
+            "home" => Some(Key::Home),
+            "end" => Some(Key::End),
+            "pageup" => Some(Key::PageUp),
+            "pagedown" => Some(Key::PageDown),
+            "shift" => Some(Key::Shift),
+            "ctrl" | "control" => Some(Key::Control),
+            "alt" => Some(Key::Alt),
+            "meta" | "win" | "command" => Some(Key::Meta),
+            "f1" => Some(Key::F1),
+            "f2" => Some(Key::F2),
+            "f3" => Some(Key::F3),
+            "f4" => Some(Key::F4),
+            "f5" => Some(Key::F5),
+            "f6" => Some(Key::F6),
+            "f7" => Some(Key::F7),
+            "f8" => Some(Key::F8),
+            "f9" => Some(Key::F9),
+            "f10" => Some(Key::F10),
+            "f11" => Some(Key::F11),
+            "f12" => Some(Key::F12),
+            single_char_key => single_char_key.chars().next().map(Key::Unicode),
+        }
+    }
 
-            // 特殊功能键
-            "esc" | "escape" => self.enigo.key(Key::Escape, Press)?,
-            "backspace" => self.enigo.key(Key::Backspace, Press)?,
+    /// Presses a key or mouse button based on string identifier.
+    fn press_key(&mut self, key_str: &str) -> Result<()> {
+        // Check if any part of the key string requires the main thread.
+        let needs_main_thread = key_str
+            .split('+')
+            .any(|part| matches!(Self::string_to_key(part.trim()), Some(Key::Unicode(_))));
 
-            // 多媒体键 (注意：这些键的可用性取决于操作系统和 enigo 的支持)
-            "volume up" => self.enigo.key(Key::VolumeUp, Press)?,
-            "volume down" => self.enigo.key(Key::VolumeDown, Press)?,
-
-            // 其他常用键的示例
-            "enter" => self.enigo.key(Key::Return, Press)?, // 或者 Key::Enter
-            "tab" => self.enigo.key(Key::Tab, Press)?,
-            "space" => self.enigo.key(Key::Space, Press)?,
-            "home" => self.enigo.key(Key::Home, Press)?,
-            "end" => self.enigo.key(Key::End, Press)?,
-            "pageup" => self.enigo.key(Key::PageUp, Press)?,
-            "pagedown" => self.enigo.key(Key::PageDown, Press)?,
-            "shift" => self.enigo.key(Key::Shift, Press)?,
-            "ctrl" | "control" => self.enigo.key(Key::Control, Press)?,
-            "alt" => self.enigo.key(Key::Alt, Press)?,
-            // F1 到 F12
-            "f1" => self.enigo.key(Key::F1, Press)?,
-            "f2" => self.enigo.key(Key::F2, Press)?,
-            "f3" => self.enigo.key(Key::F3, Press)?,
-            "f4" => self.enigo.key(Key::F4, Press)?,
-            "f5" => self.enigo.key(Key::F5, Press)?,
-            "f6" => self.enigo.key(Key::F6, Press)?,
-            "f7" => self.enigo.key(Key::F7, Press)?,
-            "f8" => self.enigo.key(Key::F8, Press)?,
-            "f9" => self.enigo.key(Key::F9, Press)?,
-            "f10" => self.enigo.key(Key::F10, Press)?,
-            "f11" => self.enigo.key(Key::F11, Press)?,
-            "f12" => self.enigo.key(Key::F12, Press)?,
-
-            // 默认情况：处理单个字符
-            // 只有当以上所有情况都不匹配时，才认为它是一个普通字符
-            single_char_key => {
-                if let Some(c) = single_char_key.chars().next() {
-                    eprintln!("Pressing character: {}", c);
-                    let app_handle = self.app_handle.clone();
-                    let key_char = c;
-                    let _ = app_handle.run_on_main_thread(move || {
-                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
-                        enigo.key(Key::Unicode(key_char), Press).unwrap()
-                    });
-                }
-            }
+        if needs_main_thread {
+            // If so, execute the entire operation on the main thread.
+            let app_handle = self.app_handle.clone();
+            let key_string = key_str.to_string();
+            app_handle.run_on_main_thread(move || {
+                let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                Self::execute_key_sequence(&mut enigo, &key_string, Press).unwrap();
+            })?;
+        } else {
+            // Otherwise, execute on the current thread.
+            Self::execute_key_sequence(&mut self.enigo, key_str, Press)?;
         }
         Ok(())
     }
 
-    /// Releases a key or mouse button based on string identifier
-    fn release_key(&mut self, key: &str) -> Result<()> {
-        match key.to_lowercase().as_str() {
-            "left" => self.enigo.button(Button::Left, Release)?,
-            "right" => self.enigo.button(Button::Right, Release)?,
-            "middle" => self.enigo.button(Button::Middle, Release)?,
+    /// Releases a key or mouse button based on string identifier.
+    fn release_key(&mut self, key_str: &str) -> Result<()> {
+        let needs_main_thread = key_str
+            .split('+')
+            .any(|part| matches!(Self::string_to_key(part.trim()), Some(Key::Unicode(_))));
 
-            // Keyboard keys
-            "esc" | "escape" => self.enigo.key(Key::Escape, Release)?,
-            "backspace" => self.enigo.key(Key::Backspace, Release)?,
-            "volume up" => self.enigo.key(Key::VolumeUp, Release)?,
-            "volume down" => self.enigo.key(Key::VolumeDown, Release)?,
-            "enter" => self.enigo.key(Key::Return, Release)?,
-            "tab" => self.enigo.key(Key::Tab, Release)?,
-            "space" => self.enigo.key(Key::Space, Release)?,
-            "home" => self.enigo.key(Key::Home, Release)?,
-            "end" => self.enigo.key(Key::End, Release)?,
-            "pageup" => self.enigo.key(Key::PageUp, Release)?,
-            "pagedown" => self.enigo.key(Key::PageDown, Release)?,
-            "shift" => self.enigo.key(Key::Shift, Release)?,
-            "ctrl" | "control" => self.enigo.key(Key::Control, Release)?,
-            "alt" => self.enigo.key(Key::Alt, Release)?,
-            "f1" => self.enigo.key(Key::F1, Release)?,
-            "f2" => self.enigo.key(Key::F2, Release)?,
-            "f3" => self.enigo.key(Key::F3, Release)?,
-            "f4" => self.enigo.key(Key::F4, Release)?,
-            "f5" => self.enigo.key(Key::F5, Release)?,
-            "f6" => self.enigo.key(Key::F6, Release)?,
-            "f7" => self.enigo.key(Key::F7, Release)?,
-            "f8" => self.enigo.key(Key::F8, Release)?,
-            "f9" => self.enigo.key(Key::F9, Release)?,
-            "f10" => self.enigo.key(Key::F10, Release)?,
-            "f11" => self.enigo.key(Key::F11, Release)?,
-            "f12" => self.enigo.key(Key::F12, Release)?,
-            single_char_key => {
-                if let Some(c) = single_char_key.chars().next() {
-                    let app_handle = self.app_handle.clone();
-                    let key_char = c;
-                    let _ = app_handle.run_on_main_thread(move || {
-                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
-                        enigo.key(Key::Unicode(key_char), Release).unwrap()
-                    });
+        if needs_main_thread {
+            let app_handle = self.app_handle.clone();
+            let key_string = key_str.to_string();
+            app_handle.run_on_main_thread(move || {
+                let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                Self::execute_key_sequence(&mut enigo, &key_string, Release).unwrap();
+            })?;
+        } else {
+            Self::execute_key_sequence(&mut self.enigo, key_str, Release)?;
+        }
+        Ok(())
+    }
+
+    /// Helper function to execute the actual key sequence on a given enigo instance.
+    fn execute_key_sequence(enigo: &mut Enigo, key_str: &str, direction: Direction) -> Result<()> {
+        match key_str.to_lowercase().as_str() {
+            "left" => enigo.button(Button::Left, direction)?,
+            "right" => enigo.button(Button::Right, direction)?,
+            "middle" => enigo.button(Button::Middle, direction)?,
+            _ => {
+                let parts: Vec<&str> = key_str.split('+').map(|k| k.trim()).collect();
+                let (action_keys_str, modifier_keys_str): (Vec<&str>, Vec<&str>) =
+                    parts.iter().copied().partition(|&k| !Self::is_modifier(k));
+
+                let modifier_keys: Vec<Key> = modifier_keys_str
+                    .iter()
+                    .filter_map(|s| Self::string_to_key(s))
+                    .collect();
+
+                let action_keys: Vec<Key> = action_keys_str
+                    .iter()
+                    .filter_map(|s| Self::string_to_key(s))
+                    .collect();
+
+                match direction {
+                    Press => {
+                        // Press all modifiers
+                        for &key in &modifier_keys {
+                            enigo.key(key, Press)?;
+                        }
+                        // Determine action based on modifiers
+                        let action_direction = if !modifier_keys.is_empty() { Click } else { Press };
+                        for &key in &action_keys {
+                            enigo.key(key, action_direction)?;
+                        }
+                    }
+                    Release => {
+                        // Release modifiers in reverse order
+                        for &key in modifier_keys.iter().rev() {
+                            enigo.key(key, Release)?;
+                        }
+                        // Release action keys only if they were pressed (no modifiers)
+                        if modifier_keys.is_empty() {
+                            for &key in action_keys.iter().rev() {
+                                enigo.key(key, Release)?;
+                            }
+                        }
+                    }
+                    Click => { // This case should ideally not be hit directly from handle_buttons
+                        for &key in &modifier_keys {
+                            enigo.key(key, Press)?;
+                        }
+                        for &key in &action_keys {
+                            enigo.key(key, Click)?;
+                        }
+                        for &key in modifier_keys.iter().rev() {
+                            enigo.key(key, Release)?;
+                        }
+                    }
                 }
             }
         }
-
         Ok(())
     }
 
