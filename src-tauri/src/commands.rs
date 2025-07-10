@@ -196,7 +196,7 @@ pub async fn set_controller_config(
     Ok(())
 }
 
-/// Resets the controller configuration to its default values.
+/// Resets the controller configuration to its default values, preserving calibration data.
 #[tauri::command]
 pub async fn reset_controller_config(
     app_handle: AppHandle,
@@ -209,8 +209,13 @@ pub async fn reset_controller_config(
         .get_controller_parser();
     let mut controller_parser_guard = controller_parser_arc.lock().await;
 
-    // Reset to default config
-    let new_config = ControllerConfig::default();
+    // Create a new default config
+    let mut new_config = ControllerConfig::default();
+    // Preserve the existing calibration data
+    new_config.mag_calibration = controller_parser_guard.config.mag_calibration.clone();
+    new_config.gyro_calibration = controller_parser_guard.config.gyro_calibration.clone();
+
+    // Update the config in the running application state
     controller_parser_guard.update_config(new_config.clone());
 
     // Save the new config to disk
