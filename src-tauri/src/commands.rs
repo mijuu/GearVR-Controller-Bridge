@@ -10,6 +10,7 @@ use tauri::{AppHandle, State, Window, Manager};
 use log::{error, info};
 use std::fs;
 use std::path::PathBuf;
+use sys_locale;
 
 // Helper function to get the path of the language config file
 fn get_lang_config_path(app_handle: &AppHandle) -> PathBuf {
@@ -27,10 +28,13 @@ pub async fn get_current_language(app_handle: AppHandle) -> Result<String, Strin
     if config_path.exists() {
         let content = fs::read_to_string(config_path).map_err(|e| e.to_string())?;
         let config: LangConfig = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-        Ok(config.language)
-    } else {
-        // Default to English if no config is found
-        Ok("en".to_string())
+        return Ok(config.language);
+    }
+
+    match sys_locale::get_locale() {
+        Some(locale) if locale.starts_with("zh") => Ok("zh".to_string()),
+        Some(locale) if locale.starts_with("en") => Ok("en".to_string()),
+        _ => Ok("en".to_string()),
     }
 }
 
