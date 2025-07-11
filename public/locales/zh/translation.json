@@ -62,7 +62,15 @@
         "calibrating": "校准中...",
         "success": "✓ 校准成功",
         "failed": "✗ 校准失败",
-        "step": "请拿起控制器，在空中画8字形..."
+        "steps": {
+          "starting": "开始磁力计校准...",
+          "figure_eight": "拿起控制器，缓慢地以8字形转动以校准磁力计。",
+          "tilt": "缓慢地上下倾斜控制器。",
+          "rotate": "缓慢地水平旋转控制器。",
+          "collection_complete": "磁力计数据收集完成。正在执行校准...",
+          "failed": "磁力计校准失败。请重试。",
+          "success": "磁力计校准成功！"
+        }
       },
       "gyro": {
         "title": "陀螺仪校准",
@@ -71,7 +79,14 @@
         "recalibrate": "重新校准",
         "calibrating": "校准中，请保持设备静止...",
         "success": "✓ 校准成功",
-        "failed": "✗ 校准失败"
+        "failed": "✗ 校准失败",
+        "steps": {
+          "starting": "开始陀螺仪校准...",
+          "still": "请将控制器静置在平坦的表面上以校准陀螺仪。",
+          "collection_complete": "陀螺仪数据收集完成。正在执行校准...",
+          "failed": "陀螺仪校准失败。请重试。",
+          "success": "陀螺仪校准成功！"
+        }
       },
       "dataTitle": "校准数据 (只读)",
       "gyroData": "陀螺仪校准数据",

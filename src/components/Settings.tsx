@@ -135,7 +135,7 @@ const CalibrationCard: React.FC<any> = ({ title, description, status, calibratio
             <div style={styles.cardBody}>
                 {status === 'calibrating' ? (
                     <div style={styles.calibrationProgress}>
-                        <p>{calibrationStep || t('settings.calibration.mag.step')}</p>
+                        <p>{t(calibrationStep || 'settings.calibration.mag.step')}</p>
                     </div>
                 ) : (
                     <p style={styles.cardDescription}>{description}</p>
@@ -174,7 +174,8 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const { t, i18n } = useTranslation();
   const [magCalibrationStatus, setMagCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [gyroCalibrationStatus, setGyroCalibrationStatus] = useState<CalibrationStatus>('idle');
-  const [calibrationStep, setCalibrationStep] = useState('');
+  const [magCalibrationStep, setMagCalibrationStep] = useState('');
+  const [gyroCalibrationStep, setGyroCalibrationStep] = useState('');
   const [controllerConfig, setControllerConfig] = useState<ControllerConfig | null>(null);
   const [mouseConfig, setMouseConfig] = useState<MouseConfig | null>(null);
   const [keymapConfig, setKeymapConfig] = useState<KeymapConfig | null>(null);
@@ -311,12 +312,15 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   }, [capturingKeyFor, handleKeymapChange]);
 
   useEffect(() => {
-    const unlistenStep = listen<string>('calibration-step', (event) => setCalibrationStep(event.payload));
-    const unlistenFinished = listen<boolean>('calibration-finished', (event) => {
-      if (magCalibrationStatus === 'calibrating') {
+    const unlistenMagStep = listen<string>('mag-calibration-step', (event) => setMagCalibrationStep(event.payload));
+    const unlistenGyroStep = listen<string>('gyro-calibration-step', (event) => setGyroCalibrationStep(event.payload));
+    const unlistenMagFinished = listen<boolean>('mag-calibration-finished', (event) => {
         setMagCalibrationStatus(event.payload ? 'success' : 'failed');
         invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
-      }
+    });
+    const unlistenGyroFinished = listen<boolean>('gyro-calibration-finished', (event) => {
+        setGyroCalibrationStatus(event.payload ? 'success' : 'failed');
+        invoke<ControllerConfig>('get_controller_config').then(setControllerConfig);
     });
 
     if (controllerConfig === null) {
@@ -330,15 +334,17 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
 
     return () => {
-      unlistenStep.then(f => f());
-      unlistenFinished.then(f => f());
+      unlistenMagStep.then(f => f());
+      unlistenGyroStep.then(f => f());
+      unlistenMagFinished.then(f => f());
+      unlistenGyroFinished.then(f => f());
     };
   }, [magCalibrationStatus]);
 
   const handleStartMagCalibration = async () => {
     try {
       setMagCalibrationStatus('calibrating');
-      setCalibrationStep(t('settings.calibration.mag.step'));
+      setMagCalibrationStep('settings.calibration.mag.step');
       await invoke('start_mag_calibration_wizard');
     } catch (error) {
       console.error('Failed to start mag calibration:', error);
@@ -348,7 +354,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const handleStartGyroCalibration = async () => {
     setGyroCalibrationStatus('calibrating');
-    setCalibrationStep(t('settings.calibration.gyro.calibrating'));
+    setGyroCalibrationStep('settings.calibration.gyro.calibrating');
     try {
       await invoke('start_gyro_calibration');
       setGyroCalibrationStatus('success');
@@ -401,8 +407,8 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 <h3 style={styles.subHeading}>{t('settings.calibration.title')}</h3>
             </div>
             <div style={styles.cardsContainer}>
-                <CalibrationCard t={t} title={t('settings.calibration.mag.title')} description={t('settings.calibration.mag.description')} status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? calibrationStep : undefined} onStart={handleStartMagCalibration} />
-                <CalibrationCard t={t} title={t('settings.calibration.gyro.title')} description={t('settings.calibration.gyro.description')} status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? t('settings.calibration.gyro.calibrating') : undefined} onStart={handleStartGyroCalibration} />
+                <CalibrationCard t={t} title={t('settings.calibration.mag.title')} description={t('settings.calibration.mag.description')} status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? t(magCalibrationStep) : undefined} onStart={handleStartMagCalibration} />
+                <CalibrationCard t={t} title={t('settings.calibration.gyro.title')} description={t('settings.calibration.gyro.description')} status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? t(gyroCalibrationStep) : undefined} onStart={handleStartGyroCalibration} />
 
                 <div style={styles.card}>
                   <h4 style={styles.subHeading4}>{t('settings.calibration.gyroData')}</h4>

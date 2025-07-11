@@ -62,7 +62,15 @@
         "calibrating": "Calibrating...",
         "success": "✓ Calibration Successful",
         "failed": "✗ Calibration Failed",
-        "step": "Please pick up the controller and draw a figure-8 in the air..."
+        "steps": {
+          "starting": "Starting magnetometer calibration...",
+          "figure_eight": "Take the controller and slowly rotate the controller in a figure-eight pattern for magnetometer calibration.",
+          "tilt": "Slowly tilt the controller up and down.",
+          "rotate": "Slowly rotate the controller horizontally.",
+          "collection_complete": "Magnetometer data collection complete. Performing calibration...",
+          "failed": "Magnetometer calibration failed. Please try again.",
+          "success": "Magnetometer calibration successful!"
+        }
       },
       "gyro": {
         "title": "Gyroscope Calibration",
@@ -71,7 +79,14 @@
         "recalibrate": "Recalibrate",
         "calibrating": "Calibrating, please keep the device still...",
         "success": "✓ Calibration Successful",
-        "failed": "✗ Calibration Failed"
+        "failed": "✗ Calibration Failed",
+        "steps": {
+          "starting": "Starting gyroscope calibration...",
+          "still": "Please place the controller still on a flat surface for gyroscope calibration.",
+          "collection_complete": "Gyroscope data collection complete. Performing calibration...",
+          "failed": "Gyroscope calibration failed. Please try again.",
+          "success": "Gyroscope calibration successful!"
+        }
       },
       "dataTitle": "Calibration Data (Read-only)",
       "gyroData": "Gyroscope Calibration Data",

@@ -264,7 +264,7 @@ impl BluetoothManager {
     /// Starts the calibration wizard.
     pub async fn start_mag_calibration_wizard(&self, window: Window) -> Result<()> {
         // Step 1: Prepare for calibration
-        window.emit("calibration-step", "Starting magnetometer calibration...")?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.starting")?;
         let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
 
         let cache_dir = window.app_handle().path().app_config_dir()?;
@@ -281,40 +281,40 @@ impl BluetoothManager {
         drop(controller_parser); // Drop the guard to release the lock
 
         // Step 2: Magnetometer calibration data collection (movement)
-        window.emit("calibration-step", "Take the controller and slowly rotate the controller in a figure-eight pattern for magnetometer calibration.")?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.figure_eight")?;
         self.start_calibration_recording(file_path.as_path()).await?;
         sleep(Duration::from_secs(10)).await; // Duration for figure-eight
 
-        window.emit("calibration-step", "Slowly tilt the controller up and down.")?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.tilt")?;
         sleep(Duration::from_secs(8)).await;
 
-        window.emit("calibration-step", "Slowly rotate the controller horizontally.")?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.rotate")?;
         sleep(Duration::from_secs(8)).await;
 
         self.stop_calibration_recording().await?;
-        window.emit("calibration-step", "Magnetometer data collection complete. Performing calibration...")?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.collection_complete")?;
 
         // Perform magnetometer calibration
         match self.perform_mag_calibration().await {
             Ok(_) => {}
             Err(e) => {
                 error!("Magnetometer calibration failed: {}", e);
-                window.emit("calibration-step", "Magnetometer calibration failed. Please try again.")?;
-                window.emit("calibration-finished", false)?;
+                window.emit("mag-calibration-step", "settings.calibration.mag.steps.failed")?;
+                window.emit("mag-calibration-finished", false)?;
                 return Ok(());
             }
         }
 
         self.save_controller_config(window.clone()).await?;
-        window.emit("calibration-step", "Magnetometer calibration successful!")?;
-        window.emit("calibration-finished", true)?;
+        window.emit("mag-calibration-step", "settings.calibration.mag.steps.success")?;
+        window.emit("mag-calibration-finished", true)?;
 
         Ok(())
     }
 
     pub async fn start_gyro_calibration(&self, window: Window) -> Result<()> {
         // Step 1: Prepare for calibration
-        window.emit("calibration-step", "Starting gyroscope calibration...")?;
+        window.emit("gyro-calibration-step", "settings.calibration.gyro.steps.starting")?;
         let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
 
         let cache_dir = window.app_handle().path().app_config_dir()?;
@@ -331,26 +331,26 @@ impl BluetoothManager {
         drop(controller_parser); // Drop the guard to release the lock
 
         // Step 2: Gyroscope calibration data collection (stillness)
-        window.emit("calibration-step", "Please place the controller still on a flat surface for gyroscope calibration.")?;
+        window.emit("gyro-calibration-step", "settings.calibration.gyro.steps.still")?;
         self.start_calibration_recording(file_path.as_path()).await?;
         sleep(Duration::from_secs(5)).await; // Duration for stillness
         self.stop_calibration_recording().await?;
-        window.emit("calibration-step", "Gyroscope data collection complete. Performing calibration...")?;
+        window.emit("gyro-calibration-step", "settings.calibration.gyro.steps.collection_complete")?;
 
         // Perform gyroscope calibration
         match self.perform_gyro_calibration().await {
             Ok(_) => {}
             Err(e) => {
                 error!("Gyroscope calibration failed: {}", e);
-                window.emit("calibration-step", "Gyroscope calibration failed. Please try again.")?;
-                window.emit("calibration-finished", false)?;
+                window.emit("gyro-calibration-step", "settings.calibration.gyro.steps.failed")?;
+                window.emit("gyro-calibration-finished", false)?;
                 return Ok(());
             }
         }
 
         self.save_controller_config(window.clone()).await?;
-        window.emit("calibration-step", "Gyroscope calibration successful!")?;
-        window.emit("calibration-finished", true)?;
+        window.emit("gyro-calibration-step", "settings.calibration.gyro.steps.success")?;
+        window.emit("gyro-calibration-finished", true)?;
 
         Ok(())
     }
