@@ -233,7 +233,12 @@ impl MouseMapper {
             "f10" => Some(Key::F10),
             "f11" => Some(Key::F11),
             "f12" => Some(Key::F12),
-            single_char_key => single_char_key.chars().next().map(Key::Unicode),
+            // Prevent multi-character strings like "left" from being treated as Unicode
+            single_char if single_char.chars().count() == 1 => {
+                single_char.chars().next().map(Key::Unicode)
+            }
+            // It's not a recognized key (e.g., it's a mouse button or an unknown key)
+            _ => None,
         }
     }
 
@@ -280,63 +285,93 @@ impl MouseMapper {
 
     /// Helper function to execute the actual key sequence on a given enigo instance.
     fn execute_key_sequence(enigo: &mut Enigo, key_str: &str, direction: Direction) -> Result<()> {
-        match key_str.to_lowercase().as_str() {
-            "left" => enigo.button(Button::Left, direction)?,
-            "right" => enigo.button(Button::Right, direction)?,
-            "middle" => enigo.button(Button::Middle, direction)?,
-            _ => {
-                let parts: Vec<&str> = key_str.split('+').map(|k| k.trim()).collect();
-                let (action_keys_str, modifier_keys_str): (Vec<&str>, Vec<&str>) =
-                    parts.iter().copied().partition(|&k| !Self::is_modifier(k));
+        let parts: Vec<&str> = key_str.split('+').map(|k| k.trim()).collect();
 
-                let modifier_keys: Vec<Key> = modifier_keys_str
-                    .iter()
-                    .filter_map(|s| Self::string_to_key(s))
-                    .collect();
+        // Separate parts into modifiers, regular keys, and mouse buttons
+        let mut modifier_keys = Vec::new();
+        let mut action_keys = Vec::new();
+        let mut mouse_buttons = Vec::new();
 
-                let action_keys: Vec<Key> = action_keys_str
-                    .iter()
-                    .filter_map(|s| Self::string_to_key(s))
-                    .collect();
-
-                match direction {
-                    Press => {
-                        // Press all modifiers
-                        for &key in &modifier_keys {
-                            enigo.key(key, Press)?;
-                        }
-                        // Determine action based on modifiers
-                        let action_direction = if !modifier_keys.is_empty() { Click } else { Press };
-                        for &key in &action_keys {
-                            enigo.key(key, action_direction)?;
-                        }
-                    }
-                    Release => {
-                        // Release modifiers in reverse order
-                        for &key in modifier_keys.iter().rev() {
-                            enigo.key(key, Release)?;
-                        }
-                        // Release action keys only if they were pressed (no modifiers)
-                        if modifier_keys.is_empty() {
-                            for &key in action_keys.iter().rev() {
-                                enigo.key(key, Release)?;
-                            }
-                        }
-                    }
-                    Click => { // This case should ideally not be hit directly from handle_buttons
-                        for &key in &modifier_keys {
-                            enigo.key(key, Press)?;
-                        }
-                        for &key in &action_keys {
-                            enigo.key(key, Click)?;
-                        }
-                        for &key in modifier_keys.iter().rev() {
-                            enigo.key(key, Release)?;
+        for part in parts {
+            let lower_part = part.to_lowercase();
+            if Self::is_modifier(&lower_part) {
+                if let Some(key) = Self::string_to_key(&lower_part) {
+                    modifier_keys.push(key);
+                }
+            } else {
+                match lower_part.as_str() {
+                    "left" => mouse_buttons.push(Button::Left),
+                    "right" => mouse_buttons.push(Button::Right),
+                    "middle" => mouse_buttons.push(Button::Middle),
+                    _ => {
+                        if let Some(key) = Self::string_to_key(&lower_part) {
+                            action_keys.push(key);
                         }
                     }
                 }
             }
         }
+
+        match direction {
+            Press => {
+                // Press all modifiers first
+                for &key in &modifier_keys {
+                    enigo.key(key, Press)?;
+                }
+
+                // Determine the action for keys and buttons
+                let action_direction = if !modifier_keys.is_empty() { Click } else { Press };
+
+                // Press action keys
+                for &key in &action_keys {
+                    enigo.key(key, action_direction)?;
+                }
+
+                // Press mouse buttons
+                for &button in &mouse_buttons {
+                    enigo.button(button, action_direction)?;
+                }
+            }
+            Release => {
+                // Release action keys and mouse buttons only if they were pressed without modifiers
+                if modifier_keys.is_empty() {
+                    for &key in action_keys.iter().rev() {
+                        enigo.key(key, Release)?;
+                    }
+                    for &button in mouse_buttons.iter().rev() {
+                        enigo.button(button, Release)?;
+                    }
+                }
+
+                // Release all modifiers last, in reverse order
+                for &key in modifier_keys.iter().rev() {
+                    enigo.key(key, Release)?;
+                }
+            }
+            Click => {
+                // This case handles a full click sequence, often used for actions combined with modifiers.
+                // Press modifiers
+                for &key in &modifier_keys {
+                    enigo.key(key, Press)?;
+                }
+
+                // Click action keys
+                for &key in &action_keys {
+                    enigo.key(key, Click)?;
+                }
+
+                // Click mouse buttons
+                for &button in &mouse_buttons {
+                    enigo.button(button, Click)?;
+                }
+
+                // Release modifiers
+                for &key in modifier_keys.iter().rev() {
+                    enigo.key(key, Release)?;
+                }
+            }
+        }
+
         Ok(())
     }
 
