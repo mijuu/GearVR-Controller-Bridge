@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -11,6 +12,7 @@ interface BluetoothDevice {
 }
 
 const MainView: React.FC = () => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'searching' | 'found' | 'connecting' | 'connected' | 'failed'>('searching');
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,9 +31,9 @@ const MainView: React.FC = () => {
       await invoke('start_scan');
     } catch (err) {
       console.error('scan', err);
-      setError(`搜索失败: ${err}`);
+      setError(t('mainView.error.scanFailed', { error: err }));
     }
-  }, []);
+  }, [t]);
   
   const connectToDevice = useCallback(async (deviceId: string) => {
     try {
@@ -41,18 +43,18 @@ const MainView: React.FC = () => {
     } catch (err) {
       const errorMessage = typeof err === 'string' ? err 
                         : err instanceof Error ? err.message
-                        : '未知错误';
+                        : 'Unknown error';
       
       if (errorMessage.includes('Peer removed pairing information')) {
-        setError('检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接');
+        setError(t('mainView.error.peerRemovedPairing'));
       } else if (errorMessage.includes('the Bluetooth device isn\'t connected: unreachable')) {
-        setError('检查到设备已被重置，请在系统设置中关闭/打开蓝牙后，重新尝试连接')
+        setError(t('mainView.error.deviceUnreachable'));
       } else {
-        setError(`连接失败: ${errorMessage}`);
+        setError(t('mainView.error.connectionFailed', { error: errorMessage }));
       }
       setStatus('failed');
     }
-  }, []);
+  }, [t]);
 
   // Start device search on mount
   useEffect(() => {    
@@ -84,7 +86,7 @@ const MainView: React.FC = () => {
     const lostUnlisten = listen<{id: string}>('device-lost-connection', () => {
       setStatus('failed');
       setDevice(null);
-      setError('设备已断开连接');
+      setError(t('mainView.error.deviceDisconnected'));
     });
 
     searchDevices();
@@ -97,7 +99,7 @@ const MainView: React.FC = () => {
       connectUnlisten.then(f => f());
       lostUnlisten.then(f => f());
     };
-  }, [searchDevices, connectToDevice]);
+  }, [searchDevices, connectToDevice, t]);
 
   return (
     <div className="main-view" style={{
@@ -172,8 +174,8 @@ const MainView: React.FC = () => {
             exit="exit"
             style={{ zIndex: 1, textAlign: 'center' }}
           >
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>搜索设备中...</h1>
-            <p>正在搜索附近的蓝牙设备</p>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('mainView.searching')}</h1>
+            <p>{t('mainView.searchingDescription')}</p>
           </motion.div>
         )}
 
@@ -186,8 +188,8 @@ const MainView: React.FC = () => {
             exit="exit"
             style={{ zIndex: 1, textAlign: 'center' }}
           >
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>找到设备</h1>
-            <p>{device.name || '未知设备'}</p>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('mainView.deviceFound')}</h1>
+            <p>{device.name || t('mainView.unknownDevice')}</p>
           </motion.div>
         )}
 
@@ -200,8 +202,8 @@ const MainView: React.FC = () => {
             exit="exit"
             style={{ zIndex: 1, textAlign: 'center' }}
           >
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接中...</h1>
-            <p>{'连接 ' + device?.name}</p>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('mainView.connecting')}</h1>
+            <p>{t('mainView.connectingTo', { deviceName: device?.name })}</p>
           </motion.div>
         )}
 
@@ -214,8 +216,8 @@ const MainView: React.FC = () => {
             exit="exit"
             style={{ zIndex: 1, textAlign: 'center' }}
           >
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接成功!</h1>
-            <p>进入控制模式</p>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('mainView.connectionSuccess')}</h1>
+            <p>{t('mainView.enteringControlMode')}</p>
           </motion.div>
         )}
 
@@ -228,9 +230,9 @@ const MainView: React.FC = () => {
             exit="exit"
             style={{ zIndex: 1, textAlign: 'center' }}
           >
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>连接失败!</h1>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('mainView.connectionFailed')}</h1>
             <div className="rescan-button" onClick={ searchDevices }>
-              <span>重新搜索</span>
+              <span>{t('mainView.rescan')}</span>
             </div>
           </motion.div>
         )}

@@ -6,8 +6,49 @@ use crate::config::controller_config::ControllerConfig;
 use crate::config::keymap_config::KeymapConfig;
 use crate::config::mouse_config::MouseConfig;
 use anyhow::{Result};
-use tauri::{AppHandle, State, Window};
-use log::{error};
+use tauri::{AppHandle, State, Window, Manager};
+use log::{error, info};
+use std::fs;
+use std::path::PathBuf;
+
+// Helper function to get the path of the language config file
+fn get_lang_config_path(app_handle: &AppHandle) -> PathBuf {
+    app_handle.path().app_config_dir().unwrap().join("lang.json")
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+struct LangConfig {
+    language: String,
+}
+
+#[tauri::command]
+pub async fn get_current_language(app_handle: AppHandle) -> Result<String, String> {
+    let config_path = get_lang_config_path(&app_handle);
+    if config_path.exists() {
+        let content = fs::read_to_string(config_path).map_err(|e| e.to_string())?;
+        let config: LangConfig = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        Ok(config.language)
+    } else {
+        // Default to English if no config is found
+        Ok("en".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn set_current_language(app_handle: AppHandle, language: String) -> Result<(), String> {
+    let config_path = get_lang_config_path(&app_handle);
+    let config = LangConfig { language };
+    let content = serde_json::to_string(&config).map_err(|e| e.to_string())?;
+    
+    // Create directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    fs::write(config_path, content).map_err(|e| e.to_string())?;
+    info!("Language set to {}", config.language);
+    Ok(())
+}
 
 #[derive(Clone, serde::Serialize)]
 pub struct ConnectionStatus {
@@ -360,7 +401,9 @@ macro_rules! export_commands {
             $crate::commands::get_keymap_config,
             $crate::commands::set_keymap_config,
             $crate::commands::reset_keymap_config,
-            $crate::commands::get_connection_status
+            $crate::commands::get_connection_status,
+            $crate::commands::get_current_language,
+            $crate::commands::set_current_language
         ]
     };
 }

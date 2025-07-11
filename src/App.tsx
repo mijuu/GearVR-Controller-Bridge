@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import MainView from "./components/MainView";
@@ -12,6 +13,7 @@ import "./App.css";
 export type AppView = 'controller' | 'settings';
 
 function App() {
+  const { t, i18n } = useTranslation();
   // 状态管理
   const [isConnected, setIsConnected] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
@@ -51,6 +53,18 @@ function App() {
     };
     checkInitialConnection();
   }, []);
+
+  useEffect(() => {
+    const initializeLanguage = async () => {
+      try {
+        const language = await invoke<string>('get_current_language');
+        i18n.changeLanguage(language);
+      } catch (err) {
+        console.error("Failed to get current language:", err);
+      }
+    };
+    initializeLanguage();
+  }, [i18n]);
 
   // 监听连接状态变化
   useEffect(() => {
@@ -183,7 +197,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>GearVR Controller Bridge</h1>
+        <h1>{t('appTitle')}</h1>
         {error && <div className="error-banner">{error}</div>}
       </header>
 
@@ -192,8 +206,8 @@ function App() {
         {sessionActive && !isConnected && (
             <div className="connection-lost-overlay">
                 <div className="connection-lost-toast">
-                    <h2>连接丢失</h2>
-                    <p>正在尝试重新连接，请按键任意键唤醒您的控制器。</p>
+                    <h2>{t('connectionLost')}</h2>
+                    <p>{t('reconnecting')}</p>
                 </div>
             </div>
         )}

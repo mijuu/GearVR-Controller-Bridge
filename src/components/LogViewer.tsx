@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface LogMessage {
   level: string;
@@ -36,6 +37,7 @@ const formatTimestamp = (timestamp: string): string => {
 };
 
 function LogViewer({ logs, onClearLogs }: LogViewerProps) {
+  const { t } = useTranslation();
   const logContentRef = useRef<HTMLDivElement>(null);
 
   // 自动滚动到底部
@@ -66,14 +68,14 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
     <div className="log-viewer" style={{ marginTop: '10px' }}>
       <div className="log-header">
         <div className="log-title">
-          <span>日志查看器 {logs.length > 0 ? `(${logs.length})` : ''}</span>
+          <span>{t('logViewer.title')} {logs.length > 0 ? `(${logs.length})` : ''}</span>
         </div>
         <button 
           onClick={onClearLogs} 
           className="clear-logs-button"
           disabled={logs.length === 0}
         >
-          清除日志
+          {t('logViewer.clearLogs')}
         </button>
       </div>
       <div 
@@ -99,7 +101,7 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
           </div>
         ))}
         {logs.length === 0 && (
-          <div className="no-logs">暂无日志</div>
+          <div className="no-logs">{t('logViewer.noLogs')}</div>
         )}
       </div>
       </div>

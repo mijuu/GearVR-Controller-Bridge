@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from "@react-three/fiber";
@@ -32,6 +33,7 @@ interface ControllerViewProps {
 }
 
 export default function ControllerStatus({ isConnected }: ControllerViewProps) {
+    const { t } = useTranslation();
     const [state, setState] = useState<ControllerState | null>(null);
     const [battery_level, setBatteryLevel] = useState<number | null>(null);
 
@@ -115,22 +117,22 @@ export default function ControllerStatus({ isConnected }: ControllerViewProps) {
                             <div className="buttons-container">
                                 <div className="button-grid">
                                     <div className={`button-indicator ${state.buttons.trigger ? "active" : ""}`}>
-                                        <span>Trigger</span>
+                                        <span>{t('controllerView.buttons.trigger')}</span>
                                     </div>
                                     <div className={`button-indicator ${state.buttons.home ? "active" : ""}`}>
-                                        <span>Home</span>
+                                        <span>{t('controllerView.buttons.home')}</span>
                                     </div>
                                     <div className={`button-indicator ${state.buttons.back ? "active" : ""}`}>
-                                        <span>Back</span>
+                                        <span>{t('controllerView.buttons.back')}</span>
                                     </div>
                                     <div className={`button-indicator ${state.buttons.touchpad ? "active" : ""}`}>
-                                        <span>Touchpad</span>
+                                        <span>{t('controllerView.buttons.touchpad')}</span>
                                     </div>
                                     <div className={`button-indicator ${state.buttons.volume_up ? "active" : ""}`}>
-                                        <span>Vol+</span>
+                                        <span>{t('controllerView.buttons.volumeUp')}</span>
                                     </div>
                                     <div className={`button-indicator ${state.buttons.volume_down ? "active" : ""}`}>
-                                        <span>Vol-</span>
+                                        <span>{t('controllerView.buttons.volumeDown')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -139,7 +141,7 @@ export default function ControllerStatus({ isConnected }: ControllerViewProps) {
                     <div className="bottom-section">
                         <div className="device-status">
                             <div className="battery-status">
-                                <span>电池: </span>
+                                <span>{t('controllerView.battery')}: </span>
                                 <div className="battery-bar">
                                     <div
                                         className="battery-level"
@@ -149,7 +151,7 @@ export default function ControllerStatus({ isConnected }: ControllerViewProps) {
                                 <span>{battery_level || '? '}%</span>
                             </div>
                             <div className="temperature-status">
-                                <span>温度: </span>
+                                <span>{t('controllerView.temperature')}: </span>
                                 <span>{state.temperature.toFixed(1)}°C</span>
                             </div>
                         </div>

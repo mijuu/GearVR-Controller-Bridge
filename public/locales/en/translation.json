@@ -1,0 +1,142 @@
+{
+  "appTitle": "GearVR Controller Bridge",
+  "connectionLost": "Connection Lost",
+  "reconnecting": "Attempting to reconnect, please press any key to wake up your controller.",
+
+  "controllerView": {
+    "buttons": {
+      "trigger": "Trigger",
+      "home": "Home",
+      "back": "Back",
+      "touchpad": "Touchpad",
+      "volumeUp": "Vol+",
+      "volumeDown": "Vol-"
+    },
+    "battery": "Battery",
+    "temperature": "Temperature"
+  },
+
+  "logViewer": {
+    "title": "Log Viewer",
+    "clearLogs": "Clear Logs",
+    "noLogs": "No logs yet"
+  },
+
+  "mainView": {
+    "searching": "Searching for devices...",
+    "searchingDescription": "Scanning for nearby Bluetooth devices",
+    "deviceFound": "Device Found",
+    "unknownDevice": "Unknown Device",
+    "connecting": "Connecting...",
+    "connectingTo": "Connecting to {{deviceName}}",
+    "connectionSuccess": "Connection Successful!",
+    "enteringControlMode": "Entering control mode",
+    "connectionFailed": "Connection Failed!",
+    "rescan": "Rescan",
+    "error": {
+      "scanFailed": "Scan failed: {{error}}",
+      "connectionFailed": "Connection failed: {{error}}",
+      "peerRemovedPairing": "Device has been reset. Please remove it from system settings and try again.",
+      "deviceUnreachable": "Device seems to have been reset. Please toggle Bluetooth off and on, then try again.",
+      "deviceDisconnected": "Device disconnected"
+    }
+  },
+
+  "settings": {
+    "title": "Settings",
+    "back": "← Back",
+    "menu": {
+      "calibration": "Sensor Calibration",
+      "controller": "Controller Settings",
+      "mouse": "Mouse Settings",
+      "keymap": "Keymap",
+      "language": "Language"
+    },
+    "calibration": {
+      "title": "Sensor Calibration",
+      "mag": {
+        "title": "Magnetometer Calibration",
+        "description": "Corrects orientation drift and improves pointing accuracy.",
+        "start": "Start Calibration",
+        "recalibrate": "Recalibrate",
+        "calibrating": "Calibrating...",
+        "success": "✓ Calibration Successful",
+        "failed": "✗ Calibration Failed",
+        "step": "Please pick up the controller and draw a figure-8 in the air..."
+      },
+      "gyro": {
+        "title": "Gyroscope Calibration",
+        "description": "Corrects jitter and offset during rotation.",
+        "start": "Start Calibration",
+        "recalibrate": "Recalibrate",
+        "calibrating": "Calibrating, please keep the device still...",
+        "success": "✓ Calibration Successful",
+        "failed": "✗ Calibration Failed"
+      },
+      "dataTitle": "Calibration Data (Read-only)",
+      "gyroData": "Gyroscope Calibration Data",
+      "magData": "Magnetometer Calibration Data",
+      "hardIronBias": "Hard Iron Bias",
+      "softIronMatrix": "Soft Iron Matrix"
+    },
+    "controller": {
+      "title": "Controller Settings",
+      "sensorLowPass": "Sensor Low-pass Filter (alpha)",
+      "deltaT": "Timestep Smoothing (alpha)",
+      "madgwickBeta": "Magnetometer Confidence (Beta)",
+      "orientationSmoothing": "Orientation Smoothing Factor",
+      "earthMagField": "Local Earth Magnetic Field (μT)",
+      "reset": "Reset to Defaults"
+    },
+    "mouse": {
+      "title": "Mouse Settings",
+      "enableAirMouse": "Enable AirMouse (Double-click Home to toggle)",
+      "touchpadSensitivity": "Touchpad Sensitivity",
+      "touchpadAcceleration": "Touchpad Acceleration",
+      "touchpadAccelThreshold": "Touchpad Acceleration Threshold",
+      "airMouseFov": "Air Mouse Sensitivity (FOV)",
+      "airMouseActivationThreshold": "Air Mouse Activation Threshold",
+      "reset": "Reset to Defaults"
+    },
+    "keymap": {
+      "title": "Keymap",
+      "description": "Click to set, press Esc to revert to default.",
+      "capturing": "Press a key or click mouse...",
+      "none": "None",
+      "reset": "Reset to Defaults",
+      "keys": {
+        "trigger": "Trigger",
+        "home": "Home",
+        "back": "Back",
+        "volume_up": "Volume Up",
+        "volume_down": "Volume Down",
+        "touchpad": "Touchpad"
+      }
+    },
+    "language": {
+      "title": "Language Settings",
+      "select": "Select Language"
+    },
+    "toast": {
+      "controllerSaved": "Controller settings saved.",
+      "mouseSaved": "Mouse settings saved.",
+      "keymapSaved": "Keymap saved.",
+      "saveFailed": "Save failed.",
+      "controllerReset": "Controller settings have been reset to default.",
+      "mouseReset": "Mouse settings have been reset to default.",
+      "keymapReset": "Keymap has been reset to default.",
+      "resetFailed": "Reset failed.",
+      "languageChanged": "Language changed successfully",
+      "languageChangeFailed": "Failed to change language"
+    }
+  },
+
+  "statusBar": {
+    "connected": "Connected: {{deviceName}}",
+    "unknownDevice": "Unknown Device",
+    "disconnected": "Disconnected",
+    "showLogs": "Show Logs",
+    "hideLogs": "Hide Logs",
+    "settings": "Settings"
+  }
+}

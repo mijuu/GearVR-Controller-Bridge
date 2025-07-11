@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -48,7 +49,7 @@ interface SettingsProps {
   onBack: () => void;
 }
 
-type ActiveMenu = 'calibration' | 'controller' | 'mouse' | 'keymap';
+type ActiveMenu = 'calibration' | 'controller' | 'mouse' | 'keymap' | 'language';
 type CalibrationStatus = 'idle' | 'calibrating' | 'success' | 'failed';
 type ToastType = 'success' | 'error';
 
@@ -115,12 +116,12 @@ const Switch: React.FC<{
 
 // --- Sub-components (unchanged) ---
 
-const CalibrationCard: React.FC<any> = ({ title, description, status, calibrationStep, onStart }) => {
+const CalibrationCard: React.FC<any> = ({ title, description, status, calibrationStep, onStart, t }) => {
     const renderStatus = () => {
         switch (status) {
-            case 'calibrating': return <div style={styles.statusIndicatorCalibrating}>校准中...</div>;
-            case 'success': return <div style={styles.statusIndicatorSuccess}>✓ 校准成功</div>;
-            case 'failed': return <div style={styles.statusIndicatorFailed}>✗ 校准失败</div>;
+            case 'calibrating': return <div style={styles.statusIndicatorCalibrating}>{t('settings.calibration.mag.calibrating')}</div>;
+            case 'success': return <div style={styles.statusIndicatorSuccess}>{t('settings.calibration.mag.success')}</div>;
+            case 'failed': return <div style={styles.statusIndicatorFailed}>{t('settings.calibration.mag.failed')}</div>;
             default: return null;
         }
     };
@@ -134,7 +135,7 @@ const CalibrationCard: React.FC<any> = ({ title, description, status, calibratio
             <div style={styles.cardBody}>
                 {status === 'calibrating' ? (
                     <div style={styles.calibrationProgress}>
-                        <p>{calibrationStep || '请按指示操作...'}</p>
+                        <p>{calibrationStep || t('settings.calibration.mag.step')}</p>
                     </div>
                 ) : (
                     <p style={styles.cardDescription}>{description}</p>
@@ -142,7 +143,7 @@ const CalibrationCard: React.FC<any> = ({ title, description, status, calibratio
             </div>
             <div style={styles.cardFooter}>
                 <button onClick={status === 'calibrating' ? undefined : onStart} disabled={status === 'calibrating'} style={styles.button}>
-                    {status === 'success' || status === 'failed' ? '重新校准' : '开始校准'}
+                    {status === 'success' || status === 'failed' ? t('settings.calibration.mag.recalibrate') : t('settings.calibration.mag.start')}
                 </button>
             </div>
         </div>
@@ -170,6 +171,7 @@ const VectorDisplay: React.FC<{ vector: Vector3, labels?: [string, string, strin
 
 // --- Main Settings Component ---
 const Settings: React.FC<SettingsProps> = ({ onBack }) => {
+  const { t, i18n } = useTranslation();
   const [magCalibrationStatus, setMagCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [gyroCalibrationStatus, setGyroCalibrationStatus] = useState<CalibrationStatus>('idle');
   const [calibrationStep, setCalibrationStep] = useState('');
@@ -195,14 +197,25 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const changeLanguage = async (lang: string) => {
+    try {
+      await i18n.changeLanguage(lang);
+      await invoke('set_current_language', { language: lang });
+      showToast(t('settings.toast.languageChanged'), 'success');
+    } catch (error) {
+      console.error('Failed to change language', error);
+      showToast(t('settings.toast.languageChangeFailed'), 'error');
+    }
+  };
+
   const handleControllerConfigChange = useCallback((field: string, value: any) => {
     if (!controllerConfig) return;
     const newConfig = { ...controllerConfig, [field]: parseFloat(value) };
     setControllerConfig(newConfig);
     invoke('set_controller_config', { config: newConfig })
-        .then(() => showToast('控制器设置已保存', 'success'))
+        .then(() => showToast(t('settings.toast.controllerSaved'), 'success'))
         .catch(err => {
-            showToast('保存失败', 'error');
+            showToast(t('settings.toast.saveFailed'), 'error');
             console.error('Failed to save controller config:', err);
         });
   }, [controllerConfig]);
@@ -212,9 +225,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const newConfig = { ...mouseConfig, [field]: value };
     setMouseConfig(newConfig);
     invoke('set_mouse_config', { config: newConfig })
-        .then(() => showToast('鼠标设置已保存', 'success'))
+        .then(() => showToast(t('settings.toast.mouseSaved'), 'success'))
         .catch(err => {
-            showToast('保存失败', 'error');
+            showToast(t('settings.toast.saveFailed'), 'error');
             console.error('Failed to save mouse config:', err);
         });
   }, [mouseConfig]);
@@ -224,9 +237,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const newConfig = { ...keymapConfig, [key]: value };
     setKeymapConfig(newConfig);
     invoke('set_keymap_config', { config: newConfig })
-        .then(() => showToast('按键映射已保存', 'success'))
+        .then(() => showToast(t('settings.toast.keymapSaved'), 'success'))
         .catch(err => {
-            showToast('保存失败', 'error');
+            showToast(t('settings.toast.saveFailed'), 'error');
             console.error('Failed to save keymap config:', err);
         });
   }, [keymapConfig]);
@@ -325,7 +338,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const handleStartMagCalibration = async () => {
     try {
       setMagCalibrationStatus('calibrating');
-      setCalibrationStep('请拿起控制器，在空中画8字形...');
+      setCalibrationStep(t('settings.calibration.mag.step'));
       await invoke('start_mag_calibration_wizard');
     } catch (error) {
       console.error('Failed to start mag calibration:', error);
@@ -335,7 +348,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const handleStartGyroCalibration = async () => {
     setGyroCalibrationStatus('calibrating');
-    setCalibrationStep('请将控制器静置在平坦表面上...');
+    setCalibrationStep(t('settings.calibration.gyro.calibrating'));
     try {
       await invoke('start_gyro_calibration');
       setGyroCalibrationStatus('success');
@@ -350,9 +363,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     try {
       const config = await invoke<ControllerConfig>('reset_controller_config');
       setControllerConfig(config);
-      showToast('控制器设置已重置为默认值', 'success');
+      showToast(t('settings.toast.controllerReset'), 'success');
     } catch (err) {
-      showToast('重置失败', 'error');
+      showToast(t('settings.toast.resetFailed'), 'error');
       console.error('Failed to reset controller config:', err);
     }
   };
@@ -361,9 +374,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     try {
       const config = await invoke<MouseConfig>('reset_mouse_config');
       setMouseConfig(config);
-      showToast('鼠标设置已重置为默认值', 'success');
+      showToast(t('settings.toast.mouseReset'), 'success');
     } catch (err) {
-      showToast('重置失败', 'error');
+      showToast(t('settings.toast.resetFailed'), 'error');
       console.error('Failed to reset mouse config:', err);
     }
   };
@@ -372,9 +385,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     try {
       const config = await invoke<KeymapConfig>('reset_keymap_config');
       setKeymapConfig(config);
-      showToast('按键映射已重置为默认值', 'success');
+      showToast(t('settings.toast.keymapReset'), 'success');
     } catch (err) {
-      showToast('重置失败', 'error');
+      showToast(t('settings.toast.resetFailed'), 'error');
       console.error('Failed to reset keymap config:', err);
     }
   };
@@ -385,20 +398,20 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         return controllerConfig && (
           <div style={styles.section}>
             <div style={styles.subHeadingContainer}>
-                <h3 style={styles.subHeading}>传感器校准</h3>
+                <h3 style={styles.subHeading}>{t('settings.calibration.title')}</h3>
             </div>
             <div style={styles.cardsContainer}>
-                <CalibrationCard title="磁力计校准" description="用于修正方向漂移，提高指向精度。" status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? calibrationStep : undefined} onStart={handleStartMagCalibration} />
-                <CalibrationCard title="陀螺仪校准" description="用于修正旋转过程中的抖动和偏移。" status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? '校准中，请保持设备静止...' : undefined} onStart={handleStartGyroCalibration} />
+                <CalibrationCard t={t} title={t('settings.calibration.mag.title')} description={t('settings.calibration.mag.description')} status={magCalibrationStatus} calibrationStep={magCalibrationStatus === 'calibrating' ? calibrationStep : undefined} onStart={handleStartMagCalibration} />
+                <CalibrationCard t={t} title={t('settings.calibration.gyro.title')} description={t('settings.calibration.gyro.description')} status={gyroCalibrationStatus} calibrationStep={gyroCalibrationStatus === 'calibrating' ? t('settings.calibration.gyro.calibrating') : undefined} onStart={handleStartGyroCalibration} />
 
                 <div style={styles.card}>
-                  <h4 style={styles.subHeading4}>陀螺仪校准数据 (只读)</h4>
+                  <h4 style={styles.subHeading4}>{t('settings.calibration.gyroData')}</h4>
                   <VectorDisplay vector={controllerConfig.gyro_calibration.zero_bias} />
 
-                  <h4 style={styles.subHeading4}>磁力计校准数据 (只读)</h4>
-                  <label>Hard Iron Bias</label>
+                  <h4 style={styles.subHeading4}>{t('settings.calibration.magData')}</h4>
+                  <label>{t('settings.calibration.hardIronBias')}</label>
                   <VectorDisplay vector={controllerConfig.mag_calibration.hard_iron_bias} />
-                  <label style={{marginTop: '10px'}}>Soft Iron Matrix</label>
+                  <label style={{marginTop: '10px'}}>{t('settings.calibration.softIronMatrix')}</label>
                   <MatrixDisplay matrix={controllerConfig.mag_calibration.soft_iron_matrix} />
                 </div>
             </div>
@@ -408,38 +421,38 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         return controllerConfig && (
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
-                    <h3 style={styles.subHeading}>控制器设置</h3>
+                    <h3 style={styles.subHeading}>{t('settings.controller.title')}</h3>
                 </div>
                 <Slider
-                    label="传感器低通滤波 (alpha)"
+                    label={t('settings.controller.sensorLowPass')}
                     min={0} max={1} step={0.01} value={controllerConfig.sensor_low_pass_alpha}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, sensor_low_pass_alpha: v })}
                     onAfterChange={() => handleControllerConfigChange('sensor_low_pass_alpha', controllerConfig.sensor_low_pass_alpha)}
                     precision={2}
                 />
                 <Slider
-                    label="时间步长平滑 (alpha)"
+                    label={t('settings.controller.deltaT')}
                     min={0} max={1} step={0.01} value={controllerConfig.delta_t_smoothing_alpha}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, delta_t_smoothing_alpha: v })}
                     onAfterChange={() => handleControllerConfigChange('delta_t_smoothing_alpha', controllerConfig.delta_t_smoothing_alpha)}
                     precision={2}
                 />
                 <Slider
-                    label="磁力计信任度 (Beta)"
+                    label={t('settings.controller.madgwickBeta')}
                     min={0} max={1} step={0.01} value={controllerConfig.madgwick_beta}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, madgwick_beta: v })}
                     onAfterChange={() => handleControllerConfigChange('madgwick_beta', controllerConfig.madgwick_beta)}
                     precision={2}
                 />
                 <Slider
-                    label="姿态平滑因子"
+                    label={t('settings.controller.orientationSmoothing')}
                     min={0} max={1} step={0.01} value={controllerConfig.orientation_smoothing_factor}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, orientation_smoothing_factor: v })}
                     onAfterChange={() => handleControllerConfigChange('orientation_smoothing_factor', controllerConfig.orientation_smoothing_factor)}
                     precision={2}
                 />
                 <Slider
-                    label="本地地磁场强度 (μT)"
+                    label={t('settings.controller.earthMagField')}
                     min={20} max={70} step={1} value={controllerConfig.local_earth_mag_field}
                     onChange={(v) => setControllerConfig({ ...controllerConfig, local_earth_mag_field: v })}
                     onAfterChange={() => handleControllerConfigChange('local_earth_mag_field', controllerConfig.local_earth_mag_field)}
@@ -452,7 +465,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         onMouseEnter={() => setHoveredReset('controller')}
                         onMouseLeave={() => setHoveredReset(null)}
                     >
-                        恢复默认设置
+                        {t('settings.controller.reset')}
                     </button>
                 </div>
             </div>
@@ -461,43 +474,43 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         return mouseConfig && (
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
-                    <h3 style={styles.subHeading}>鼠标设置</h3>
+                    <h3 style={styles.subHeading}>{t('settings.mouse.title')}</h3>
                 </div>
                 <Switch
-                    label="启用AirMouse (双击Home快捷开启)"
+                    label={t('settings.mouse.enableAirMouse')}
                     checked={mouseConfig.mode === 'AirMouse'}
                     onChange={(isChecked) => handleMouseConfigChange('mode', isChecked ? 'AirMouse' : 'Touchpad')}
                 />
                 <Slider
-                    label="触摸板灵敏度"
+                    label={t('settings.mouse.touchpadSensitivity')}
                     min={1} max={1000} step={1} value={mouseConfig.touchpad_sensitivity}
                     onChange={(v) => setMouseConfig({...mouseConfig, touchpad_sensitivity: v})}
                     onAfterChange={() => handleMouseConfigChange('touchpad_sensitivity', mouseConfig.touchpad_sensitivity)}
                     precision={0}
                 />
                 <Slider
-                    label="触摸板加速度"
+                    label={t('settings.mouse.touchpadAcceleration')}
                     min={0} max={10} step={0.1} value={mouseConfig.touchpad_acceleration}
                     onChange={(v) => setMouseConfig({...mouseConfig, touchpad_acceleration: v})}
                     onAfterChange={() => handleMouseConfigChange('touchpad_acceleration', mouseConfig.touchpad_acceleration)}
                     precision={1}
                 />
                 <Slider
-                    label="触摸板加速度阈值"
+                    label={t('settings.mouse.touchpadAccelThreshold')}
                     min={0} max={0.01} step={0.0001} value={mouseConfig.touchpad_acceleration_threshold}
                     onChange={(v) => setMouseConfig({...mouseConfig, touchpad_acceleration_threshold: v})}
                     onAfterChange={() => handleMouseConfigChange('touchpad_acceleration_threshold', mouseConfig.touchpad_acceleration_threshold)}
                     precision={4}
                 />
                 <Slider
-                    label="空中鼠标灵敏度 (FOV)"
+                    label={t('settings.mouse.airMouseFov')}
                     min={10} max={180} step={1} value={mouseConfig.air_mouse_fov}
                     onChange={(v) => setMouseConfig({...mouseConfig, air_mouse_fov: v})}
                     onAfterChange={() => handleMouseConfigChange('air_mouse_fov', mouseConfig.air_mouse_fov)}
                     precision={0}
                 />
                 <Slider
-                    label="空中鼠标激活阈值"
+                    label={t('settings.mouse.airMouseActivationThreshold')}
                     min={0} max={20} step={0.5} value={mouseConfig.air_mouse_activation_threshold}
                     onChange={(v) => setMouseConfig({...mouseConfig, air_mouse_activation_threshold: v})}
                     onAfterChange={() => handleMouseConfigChange('air_mouse_activation_threshold', mouseConfig.air_mouse_activation_threshold)}
@@ -510,7 +523,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         onMouseEnter={() => setHoveredReset('mouse')}
                         onMouseLeave={() => setHoveredReset(null)}
                     >
-                        恢复默认设置
+                        {t('settings.mouse.reset')}
                     </button>
                 </div>
             </div>
@@ -519,17 +532,17 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         return keymapConfig && (
             <div style={styles.section}>
                 <div style={styles.subHeadingContainer}>
-                    <h3 style={styles.subHeading}>按键映射</h3>
+                    <h3 style={styles.subHeading}>{t('settings.keymap.title')}</h3>
                 </div>
-                <h4 style={styles.subHeading4}>按键映射 (单击以设置, Esc还原默认)</h4>
+                <h4 style={styles.subHeading4}>{t('settings.keymap.description')}</h4>
                 {Object.entries(keymapConfig).map(([key, value]) => (
                 <div style={styles.formGroupRow} key={key}>
-                  <label style={styles.keymapLabel}>{key}</label>
+                  <label style={styles.keymapLabel}>{t(`settings.keymap.keys.${key}`)}</label>
                   <button 
                     onClick={() => setCapturingKeyFor(key)}
                     style={capturingKeyFor === key ? styles.keymapButtonCapturing : styles.keymapButton}
                   >
-                    {capturingKeyFor === key ? '请按键或点击鼠标...' : (value || '无')}
+                    {capturingKeyFor === key ? t('settings.keymap.capturing') : (value || t('settings.keymap.none'))}
                   </button>
                 </div>
               ))}
@@ -540,9 +553,24 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     onMouseEnter={() => setHoveredReset('keymap')}
                     onMouseLeave={() => setHoveredReset(null)}
                   >
-                    恢复默认设置
+                    {t('settings.keymap.reset')}
                   </button>
               </div>
+            </div>
+        );
+      case 'language':
+        return (
+            <div style={styles.section}>
+                <div style={styles.subHeadingContainer}>
+                    <h3 style={styles.subHeading}>{t('settings.language.title')}</h3>
+                </div>
+                <div style={styles.formGroupRow}>
+                    <label style={styles.switchLabel}>{t('settings.language.select')}</label>
+                    <select style={styles.select} value={i18n.language} onChange={(e) => changeLanguage(e.target.value)}>
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
             </div>
         );
       default:
@@ -554,12 +582,13 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     <div style={styles.page}>
         <div style={styles.container}>
             <div style={styles.leftMenu}>
-                <h2 style={styles.heading}>设置</h2>
-                <button style={activeMenu === 'calibration' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('calibration')}>传感器校准</button>
-                <button style={activeMenu === 'controller' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('controller')}>控制器设置</button>
-                <button style={activeMenu === 'mouse' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('mouse')}>鼠标设置</button>
-                <button style={activeMenu === 'keymap' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('keymap')}>按键映射</button>
-                <button style={{...styles.menuButton, marginTop: 'auto'}} onClick={onBack}>← 返回</button>
+                <h2 style={styles.heading}>{t('settings.title')}</h2>
+                <button style={activeMenu === 'calibration' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('calibration')}>{t('settings.menu.calibration')}</button>
+                <button style={activeMenu === 'controller' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('controller')}>{t('settings.menu.controller')}</button>
+                <button style={activeMenu === 'mouse' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('mouse')}>{t('settings.menu.mouse')}</button>
+                <button style={activeMenu === 'keymap' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('keymap')}>{t('settings.menu.keymap')}</button>
+                <button style={activeMenu === 'language' ? styles.menuButtonActive : styles.menuButton} onClick={() => setActiveMenu('language')}>{t('settings.menu.language')}</button>
+                <button style={{...styles.menuButton, marginTop: 'auto'}} onClick={onBack}>{t('settings.back')}</button>
             </div>
             <div style={styles.rightContent}>
                 {renderContent()}
@@ -712,6 +741,14 @@ const styles: { [key: string]: React.CSSProperties } = {
         textAlign: 'center',
         fontWeight: 'bold',
     },
+    select: {
+        border: '1px solid #555',
+        padding: '8px 15px',
+        borderRadius: '5px',
+        fontSize: '1rem',
+        cursor: 'pointer',
+        minWidth: '150px',
+    }
 };
 
 export default Settings;

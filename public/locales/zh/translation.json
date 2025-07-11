@@ -1,0 +1,142 @@
+{
+  "appTitle": "GearVR Controller Bridge",
+  "connectionLost": "连接丢失",
+  "reconnecting": "正在尝试重新连接，请按键任意键唤醒您的控制器。",
+
+  "controllerView": {
+    "buttons": {
+      "trigger": "扳机",
+      "home": "主页",
+      "back": "返回",
+      "touchpad": "触摸板",
+      "volumeUp": "音量+",
+      "volumeDown": "音量-"
+    },
+    "battery": "电池",
+    "temperature": "温度"
+  },
+
+  "logViewer": {
+    "title": "日志查看器",
+    "clearLogs": "清除日志",
+    "noLogs": "暂无日志"
+  },
+
+  "mainView": {
+    "searching": "搜索设备中...",
+    "searchingDescription": "正在搜索附近的蓝牙设备",
+    "deviceFound": "找到设备",
+    "unknownDevice": "未知设备",
+    "connecting": "连接中...",
+    "connectingTo": "正在连接 {{deviceName}}",
+    "connectionSuccess": "连接成功!",
+    "enteringControlMode": "进入控制模式",
+    "connectionFailed": "连接失败!",
+    "rescan": "重新搜索",
+    "error": {
+      "scanFailed": "搜索失败: {{error}}",
+      "connectionFailed": "连接失败: {{error}}",
+      "peerRemovedPairing": "检查到设备已被重置，请在系统设置中选择忽略此设备后，重新尝试连接",
+      "deviceUnreachable": "检查到设备已被重置，请在系统设置中关闭/打开蓝牙后，重新尝试连接",
+      "deviceDisconnected": "设备已断开连接"
+    }
+  },
+
+  "settings": {
+    "title": "设置",
+    "back": "← 返回",
+    "menu": {
+      "calibration": "传感器校准",
+      "controller": "控制器设置",
+      "mouse": "鼠标设置",
+      "keymap": "按键映射",
+      "language": "语言"
+    },
+    "calibration": {
+      "title": "传感器校准",
+      "mag": {
+        "title": "磁力计校准",
+        "description": "用于修正方向漂移，提高指向精度。",
+        "start": "开始校准",
+        "recalibrate": "重新校准",
+        "calibrating": "校准中...",
+        "success": "✓ 校准成功",
+        "failed": "✗ 校准失败",
+        "step": "请拿起控制器，在空中画8字形..."
+      },
+      "gyro": {
+        "title": "陀螺仪校准",
+        "description": "用于修正旋转过程中的抖动和偏移。",
+        "start": "开始校准",
+        "recalibrate": "重新校准",
+        "calibrating": "校准中，请保持设备静止...",
+        "success": "✓ 校准成功",
+        "failed": "✗ 校准失败"
+      },
+      "dataTitle": "校准数据 (只读)",
+      "gyroData": "陀螺仪校准数据",
+      "magData": "磁力计校准数据",
+      "hardIronBias": "硬铁偏移",
+      "softIronMatrix": "软铁矩阵"
+    },
+    "controller": {
+      "title": "控制器设置",
+      "sensorLowPass": "传感器低通滤波 (alpha)",
+      "deltaT": "时间步长平滑 (alpha)",
+      "madgwickBeta": "磁力计信任度 (Beta)",
+      "orientationSmoothing": "姿态平滑因子",
+      "earthMagField": "本地地磁场强度 (μT)",
+      "reset": "恢复默认设置"
+    },
+    "mouse": {
+      "title": "鼠标设置",
+      "enableAirMouse": "启用AirMouse (双击Home快捷开启)",
+      "touchpadSensitivity": "触摸板灵敏度",
+      "touchpadAcceleration": "触摸板加速度",
+      "touchpadAccelThreshold": "触摸板加速度阈值",
+      "airMouseFov": "空中鼠标灵敏度 (FOV)",
+      "airMouseActivationThreshold": "空中鼠标激活阈值",
+      "reset": "恢复默认设置"
+    },
+    "keymap": {
+      "title": "按键映射",
+      "description": "单击以设置, Esc还原默认",
+      "capturing": "请按键或点击鼠标...",
+      "none": "无",
+      "reset": "恢复默认设置",
+      "keys": {
+        "trigger": "扳机",
+        "home": "主页",
+        "back": "返回",
+        "volume_up": "音量+",
+        "volume_down": "音量-",
+        "touchpad": "触摸板"
+      }
+    },
+    "language": {
+      "title": "语言设置",
+      "select": "选择语言"
+    },
+    "toast": {
+      "controllerSaved": "控制器设置已保存",
+      "mouseSaved": "鼠标设置已保存",
+      "keymapSaved": "按键映射已保存",
+      "saveFailed": "保存失败",
+      "controllerReset": "控制器设置已重置为默认值",
+      "mouseReset": "鼠标设置已重置为默认值",
+      "keymapReset": "按键映射已重置为默认值",
+      "resetFailed": "重置失败",
+      "languageChanged": "语言切换成功",
+      "languageChangeFailed": "语言切换失败"
+    }
+  },
+
+  "statusBar": {
+    "connected": "已连接: {{deviceName}}",
+    "unknownDevice": "未知设备",
+    "disconnected": "未连接",
+    "showLogs": "显示日志",
+    "hideLogs": "隐藏日志",
+    "settings": "设置"
+  }
+}

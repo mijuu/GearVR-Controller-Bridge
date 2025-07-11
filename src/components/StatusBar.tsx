@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppView } from '../App';
 
 interface StatusBarProps {
@@ -10,6 +11,7 @@ interface StatusBarProps {
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs, setShowLogs, onViewChange }) => {
+  const { t } = useTranslation();
   const handleSettingsClick = () => {
     if (isConnected) {
       onViewChange('settings');
@@ -23,8 +25,8 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
           <span>
             {isConnected
-              ? `已连接: ${deviceName || '未知设备'}`
-              : '未连接'}
+              ? t('statusBar.connected', { deviceName: deviceName || t('statusBar.unknownDevice') })
+              : t('statusBar.disconnected')}
           </span>
         </div>
       </div>
@@ -34,14 +36,14 @@ const StatusBar: React.FC<StatusBarProps> = ({ isConnected, deviceName, showLogs
           className="log-toggle-link" 
           onClick={() => setShowLogs(!showLogs)}
         >
-          {showLogs ? '隐藏日志' : '显示日志'}
+          {showLogs ? t('statusBar.hideLogs') : t('statusBar.showLogs')}
         </div>
         <div 
           className={`settings-link ${!isConnected ? 'disabled' : ''}`}
           onClick={handleSettingsClick}
           style={{ marginLeft: '1rem' }}
         >
-          设置
+          {t('statusBar.settings')}
         </div>
       </div>
 
