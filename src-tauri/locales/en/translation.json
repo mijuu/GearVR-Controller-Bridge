@@ -2,6 +2,10 @@
   "appTitle": "GearVR Controller Bridge",
   "connectionLost": "Connection Lost",
   "reconnecting": "Attempting to reconnect, please press any key to wake up your controller.",
+  "trayMenu": {
+    "show": "Show",
+    "quit": "Quit"
+  },
 
   "controllerView": {
     "buttons": {

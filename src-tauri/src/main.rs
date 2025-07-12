@@ -1,53 +1,21 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use gearvr_controller_bridge_lib::{logging, state::AppState};
+use gearvr_controller_bridge_lib::{logging, state::AppState, tray};
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
-    image::Image,
-    Manager, WindowEvent, ActivationPolicy,
+    Manager, WindowEvent, ActivationPolicy
 };
-use std::path::PathBuf;
-use log::info;
+use log::{info};
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
         // Register our commands
         .invoke_handler(gearvr_controller_bridge_lib::export_commands!())
         // Setup our application state
         .setup(move |app| {
-            let show_i = MenuItem::with_id(app, "show", "显示", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
-
-            let icon_path = PathBuf::from("icons/tray.png");
-            let custom_icon = match Image::from_path(icon_path) {
-                Ok(icon) => icon,
-                Err(e) => {
-                    eprintln!("Error loading icon: {}", e);
-                    app.default_window_icon().unwrap().clone()
-                }
-            };
-            TrayIconBuilder::new()
-                .icon(custom_icon)
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            #[cfg(target_os = "macos")]
-                            app.set_activation_policy(ActivationPolicy::Regular).unwrap();
-                        }
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .build(app)?;
+            let tray = tray::create_tray(app.handle()).expect("Failed to create tray");
+            app.manage(tray);
 
             let rt = tokio::runtime::Runtime::new()
                 .map_err(|e| format!("Failed to create Tokio runtime: {}", e))?;

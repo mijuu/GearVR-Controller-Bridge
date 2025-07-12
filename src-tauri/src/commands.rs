@@ -39,7 +39,10 @@ pub async fn get_current_language(app_handle: AppHandle) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub async fn set_current_language(app_handle: AppHandle, language: String) -> Result<(), String> {
+pub async fn set_current_language(app_handle: AppHandle, app_state: State<'_, AppState>, language: String) -> Result<(), String> {
+    // Update the tray menu language
+    app_state.update_tray_menu_lang(&app_handle, &language).expect("Failed to update tray menu");
+
     let config_path = get_lang_config_path(&app_handle);
     let config = LangConfig { language };
     let content = serde_json::to_string(&config).map_err(|e| e.to_string())?;

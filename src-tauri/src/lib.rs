@@ -3,6 +3,7 @@
 
 // Module declarations
 pub mod core;
+pub mod tray;
 pub mod mapping;
 pub mod state;
 pub mod config;

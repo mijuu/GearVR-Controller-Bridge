@@ -4,9 +4,10 @@
 use std::sync::{Arc};
 use tokio::sync::{Mutex};
 use anyhow::{Result};
-use tauri::AppHandle;
+use tauri::{tray::TrayIcon, AppHandle, Manager, State};
 use log::{info};
 use crate::core::BluetoothManager;
+use crate::tray;
 use crate::mapping::mouse::MouseMapperSender;
 use crate::config::controller_config::ControllerConfig;
 use crate::config::mouse_config::MouseConfig;
@@ -43,5 +44,12 @@ impl AppState {
     /// Gets a reference to the Bluetooth manager
     pub fn get_bluetooth_manager_arc(&self) -> Arc<Mutex<BluetoothManager>> {
         self.bluetooth_manager.clone()
+    }
+
+    pub fn update_tray_menu_lang(&self, app_handle: &AppHandle, lang: &str) -> Result<()> {
+        let tray_state: State<TrayIcon> = app_handle.state();
+        tray::update_tray_menu(&app_handle, &tray_state, lang).expect("Failed to update tray menu");
+
+        Ok(())
     }
 }
