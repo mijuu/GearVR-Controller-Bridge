@@ -150,8 +150,7 @@ function LogViewer({ logs, onClearLogs }: LogViewerProps) {
         }
 
         .log-entries {
-          flex: 1;
-          overflow-y: auto;
+          
         }
 
         .clear-logs-button {
