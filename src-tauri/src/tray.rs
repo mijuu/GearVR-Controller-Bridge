@@ -8,7 +8,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIcon, TrayIconBuilder},
     path::BaseDirectory,
-    AppHandle, Manager, ActivationPolicy,
+    AppHandle, Manager, ActivationPolicy, State,
 };
 use log::error;
 use crate::commands;
@@ -21,11 +21,11 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
     let lang = tauri::async_runtime::block_on(commands::get_current_language(app_handle.clone()))
         .unwrap_or_else(|_| "en".to_string());
 
-    let icon_path = PathBuf::from("icons/tray.png");
-    let custom_icon = Image::from_path(icon_path)?;
+    let tray_icon = get_tray_icon(app_handle)?;
 
     let tray = TrayIconBuilder::new()
-        .icon(custom_icon)
+        .icon(tray_icon)
+        .icon_as_template(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
@@ -46,8 +46,39 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
         error!("Failed to set initial tray menu: {}", e);
     }
 
+    // Add a theme change event listener
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let app_handle = app_handle.clone();
+        window.on_window_event(move |event| {
+            if let tauri::WindowEvent::ThemeChanged(_) = event {
+                let tray_state: State<TrayIcon> = app_handle.state();
+                if let Ok(icon) = get_tray_icon(&app_handle) {
+                    if let Err(e) = tray_state.set_icon(Some(icon)) {
+                        error!("Failed to set tray icon: {}", e);
+                    }
+                    tray_state.set_icon_as_template(true)
+                        .expect("Failed to set tray icon as template");
+                }
+            }
+        });
+    }
+
     Ok(tray)
 }
+
+/// Gets the appropriate tray icon based on the current system theme.
+fn get_tray_icon(app_handle: &AppHandle) -> Result<Image<'static>, Box<dyn std::error::Error>> {
+    let window = app_handle.get_webview_window("main").ok_or("Main window not found")?;
+    let theme = window.theme()?;
+    let icon_path = match theme {
+        tauri::Theme::Light => PathBuf::from("icons/tray.png"),
+        // Use macOS template icon for macOS
+        tauri::Theme::Dark => PathBuf::from("icons/tray.png"),
+        _ => PathBuf::from("icons/tray.png"),
+    };
+    Image::from_path(icon_path).map_err(|e| e.into())
+}
+
 
 /// Loads and flattens translations from a JSON file.
 pub fn load_translations(app_handle: &AppHandle, lang: &str) -> Option<Translations> {
