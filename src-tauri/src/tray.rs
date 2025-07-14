@@ -8,10 +8,13 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIcon, TrayIconBuilder},
     path::BaseDirectory,
-    AppHandle, Manager, ActivationPolicy, State,
+    AppHandle, Manager, State,
 };
 use log::error;
 use crate::commands;
+
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 
 // Define a type for our translations
 pub type Translations = HashMap<String, String>;
@@ -56,6 +59,7 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
                     if let Err(e) = tray_state.set_icon(Some(icon)) {
                         error!("Failed to set tray icon: {}", e);
                     }
+                    #[cfg(target_os = "macos")]
                     tray_state.set_icon_as_template(true)
                         .expect("Failed to set tray icon as template");
                 }
@@ -68,13 +72,16 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
 
 /// Gets the appropriate tray icon based on the current system theme.
 fn get_tray_icon(app_handle: &AppHandle) -> Result<Image<'static>, Box<dyn std::error::Error>> {
-    let window = app_handle.get_webview_window("main").ok_or("Main window not found")?;
-    let theme = window.theme()?;
-    let icon_path = match theme {
-        tauri::Theme::Light => PathBuf::from("icons/tray.png"),
-        // Use macOS template icon for macOS
-        tauri::Theme::Dark => PathBuf::from("icons/tray.png"),
-        _ => PathBuf::from("icons/tray.png"),
+    let icon_path = if cfg!(target_os = "macos") {
+        PathBuf::from("icons/tray-dark.png")
+    } else {
+        let window = app_handle.get_webview_window("main").ok_or("Main window not found")?;
+        let theme = window.theme()?;
+        match theme {
+            tauri::Theme::Light => PathBuf::from("icons/tray-light.png"),
+            tauri::Theme::Dark => PathBuf::from("icons/tray-dark.png"),
+            _ => PathBuf::from("icons/tray-dark.png"),
+        }
     };
     Image::from_path(icon_path).map_err(|e| e.into())
 }

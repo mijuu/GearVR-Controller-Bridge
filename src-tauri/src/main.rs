@@ -3,9 +3,12 @@
 
 use gearvr_controller_bridge_lib::{logging, state::AppState, tray};
 use tauri::{
-    Manager, WindowEvent, ActivationPolicy
+    Manager, WindowEvent
 };
 use log::{info};
+
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 
 fn main() {
     tauri::Builder::default()
