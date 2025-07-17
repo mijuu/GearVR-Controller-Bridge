@@ -89,17 +89,6 @@ impl BluetoothManager {
                 .cloned()
                 .ok_or_else(|| anyhow!("Device not found with ID: {}", device_id))?
         };
-
-        if device.is_connected().await {
-            self.disconnect().await?;
-        }
-
-        if cfg!(target_os = "windows") {
-            if device.is_paired().await? {
-                info!("Device is already paired, unpairing...");
-                device.unpair().await?;
-            }
-        }
         
         // Connect to the device with retry mechanism
         let (notify_char, write_char, battery_char) = self.connection_manager.connect_with_retry(

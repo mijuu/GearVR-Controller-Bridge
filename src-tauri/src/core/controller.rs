@@ -449,7 +449,6 @@ impl ControllerParser {
         if buttons.home {
             // 记录当前的 AHRS 四元数的逆
             self.last_zero_quaternion = Some(orientation.inverse()); // 记录未经过归零的 AHRS 输出的逆
-            warn!("Re-zeroed orientation!");
         }
         if let Some(zero_q) = self.last_zero_quaternion {
             // 应用归零转换

@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use bluest::{Adapter, Characteristic, Device, Uuid};
+use bluest::pairing::NoInputOutputPairingAgent;
 use log::{info, warn, error};
 use std::time::Duration;
 use tauri::{Window, Emitter};
@@ -95,6 +96,12 @@ impl ConnectionManager {
                 info!("Initiating connection to {}...", id);
                 self.adapter.connect_device(&device).await?;
                 info!("Connection successful");
+            }
+        } else {
+            if !device.is_paired().await? {
+                info!("Pairing device...");
+                device.pair_with_agent(&NoInputOutputPairingAgent).await?;
+                info!("Pairing successful");
             }
         }
         
