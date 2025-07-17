@@ -119,9 +119,9 @@ const Switch: React.FC<{
 const CalibrationCard: React.FC<any> = ({ title, description, status, calibrationStep, onStart, t }) => {
     const renderStatus = () => {
         switch (status) {
-            case 'calibrating': return <div style={styles.statusIndicatorCalibrating}>{t('settings.calibration.mag.calibrating')}</div>;
-            case 'success': return <div style={styles.statusIndicatorSuccess}>{t('settings.calibration.mag.success')}</div>;
-            case 'failed': return <div style={styles.statusIndicatorFailed}>{t('settings.calibration.mag.failed')}</div>;
+            case 'calibrating': return <div style={styles.statusIndicatorCalibrating}>{t('settings.calibration.calibrating')}</div>;
+            case 'success': return <div style={styles.statusIndicatorSuccess}>{t('settings.calibration.success')}</div>;
+            case 'failed': return <div style={styles.statusIndicatorFailed}>{t('settings.calibration.failed')}</div>;
             default: return null;
         }
     };
@@ -135,7 +135,7 @@ const CalibrationCard: React.FC<any> = ({ title, description, status, calibratio
             <div style={styles.cardBody}>
                 {status === 'calibrating' ? (
                     <div style={styles.calibrationProgress}>
-                        <p>{t(calibrationStep || 'settings.calibration.mag.step')}</p>
+                        <p>{t(calibrationStep)}</p>
                     </div>
                 ) : (
                     <p style={styles.cardDescription}>{description}</p>
@@ -143,7 +143,7 @@ const CalibrationCard: React.FC<any> = ({ title, description, status, calibratio
             </div>
             <div style={styles.cardFooter}>
                 <button onClick={status === 'calibrating' ? undefined : onStart} disabled={status === 'calibrating'} style={styles.button}>
-                    {status === 'success' || status === 'failed' ? t('settings.calibration.mag.recalibrate') : t('settings.calibration.mag.start')}
+                    {status === 'success' || status === 'failed' ? t('settings.calibration.recalibrate') : t('settings.calibration.start')}
                 </button>
             </div>
         </div>
@@ -344,7 +344,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const handleStartMagCalibration = async () => {
     try {
       setMagCalibrationStatus('calibrating');
-      setMagCalibrationStep('settings.calibration.mag.step');
+      setMagCalibrationStep('settings.calibration.mag.steps.figure_eight');
       await invoke('start_mag_calibration_wizard');
     } catch (error) {
       console.error('Failed to start mag calibration:', error);
@@ -354,7 +354,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const handleStartGyroCalibration = async () => {
     setGyroCalibrationStatus('calibrating');
-    setGyroCalibrationStep('settings.calibration.gyro.calibrating');
+    setGyroCalibrationStep('settings.calibration.gyro.steps.still');
     try {
       await invoke('start_gyro_calibration');
       setGyroCalibrationStatus('success');

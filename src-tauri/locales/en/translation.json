@@ -58,14 +58,14 @@
     },
     "calibration": {
       "title": "Sensor Calibration",
+      "start": "Start Calibration",
+      "recalibrate": "Recalibrate",
+      "calibrating": "Calibrating...",
+      "success": "✓ Calibration Successful",
+      "failed": "✗ Calibration Failed",
       "mag": {
         "title": "Magnetometer Calibration",
         "description": "Corrects orientation drift and improves pointing accuracy.",
-        "start": "Start Calibration",
-        "recalibrate": "Recalibrate",
-        "calibrating": "Calibrating...",
-        "success": "✓ Calibration Successful",
-        "failed": "✗ Calibration Failed",
         "steps": {
           "starting": "Starting magnetometer calibration...",
           "figure_eight": "Take the controller and slowly rotate the controller in a figure-eight pattern for magnetometer calibration.",
@@ -79,11 +79,6 @@
       "gyro": {
         "title": "Gyroscope Calibration",
         "description": "Corrects jitter and offset during rotation.",
-        "start": "Start Calibration",
-        "recalibrate": "Recalibrate",
-        "calibrating": "Calibrating, please keep the device still...",
-        "success": "✓ Calibration Successful",
-        "failed": "✗ Calibration Failed",
         "steps": {
           "starting": "Starting gyroscope calibration...",
           "still": "Please place the controller still on a flat surface for gyroscope calibration.",

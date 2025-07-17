@@ -58,14 +58,14 @@
     },
     "calibration": {
       "title": "传感器校准",
+      "start": "开始校准",
+      "recalibrate": "重新校准",
+      "calibrating": "校准中...",
+      "success": "✓ 校准成功",
+      "failed": "✗ 校准失败",
       "mag": {
         "title": "磁力计校准",
         "description": "用于修正方向漂移，提高指向精度。",
-        "start": "开始校准",
-        "recalibrate": "重新校准",
-        "calibrating": "校准中...",
-        "success": "✓ 校准成功",
-        "failed": "✗ 校准失败",
         "steps": {
           "starting": "开始磁力计校准...",
           "figure_eight": "拿起控制器，缓慢地以8字形转动以校准磁力计。",
@@ -79,11 +79,6 @@
       "gyro": {
         "title": "陀螺仪校准",
         "description": "用于修正旋转过程中的抖动和偏移。",
-        "start": "开始校准",
-        "recalibrate": "重新校准",
-        "calibrating": "校准中，请保持设备静止...",
-        "success": "✓ 校准成功",
-        "failed": "✗ 校准失败",
         "steps": {
           "starting": "开始陀螺仪校准...",
           "still": "请将控制器静置在平坦的表面上以校准陀螺仪。",
