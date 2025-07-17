@@ -1,7 +1,7 @@
+use chrono::Local;
 use log::{Level, LevelFilter, Metadata, Record};
 use serde::Serialize;
 use std::sync::OnceLock;
-use chrono::Local;
 use tauri::Emitter;
 use thiserror::Error;
 
@@ -34,9 +34,11 @@ impl TauriLogger {
 
     pub fn init(app_handle: tauri::AppHandle, level: Level) -> Result<(), LoggerError> {
         let logger = TauriLogger::new(app_handle, level);
-        
-        LOGGER.set(logger).map_err(|_| LoggerError::AlreadyInitialized)?;
-        
+
+        LOGGER
+            .set(logger)
+            .map_err(|_| LoggerError::AlreadyInitialized)?;
+
         // 将 Level 转换为对应的 LevelFilter
         let level_filter = match level {
             Level::Error => LevelFilter::Error,
@@ -45,11 +47,11 @@ impl TauriLogger {
             Level::Debug => LevelFilter::Debug,
             Level::Trace => LevelFilter::Trace,
         };
-        
+
         log::set_logger(LOGGER.get().unwrap())
             .map(|()| log::set_max_level(level_filter))
             .map_err(|e| LoggerError::SetLoggerFailed(e.to_string()))?;
-            
+
         Ok(())
     }
 
@@ -76,7 +78,7 @@ impl log::Log for TauriLogger {
         if self.enabled(record.metadata()) {
             // 同时输出到标准错误
             eprintln!("[{}] {}", record.level(), record.args());
-            
+
             // 发送到前端
             self.emit_log(record);
         }

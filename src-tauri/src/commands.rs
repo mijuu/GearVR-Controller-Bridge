@@ -1,20 +1,24 @@
 //! Tauri commands
 //! This module defines all the commands that can be invoked from the frontend.
 
-use crate::state::AppState;
 use crate::config::controller_config::ControllerConfig;
 use crate::config::keymap_config::KeymapConfig;
 use crate::config::mouse_config::MouseConfig;
-use anyhow::{Result};
-use tauri::{AppHandle, State, Window, Manager};
+use crate::state::AppState;
+use anyhow::Result;
 use log::{error, info};
 use std::fs;
 use std::path::PathBuf;
 use sys_locale;
+use tauri::{AppHandle, Manager, State, Window};
 
 // Helper function to get the path of the language config file
 fn get_lang_config_path(app_handle: &AppHandle) -> PathBuf {
-    app_handle.path().app_config_dir().unwrap().join("lang.json")
+    app_handle
+        .path()
+        .app_config_dir()
+        .unwrap()
+        .join("lang.json")
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -39,14 +43,20 @@ pub async fn get_current_language(app_handle: AppHandle) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub async fn set_current_language(app_handle: AppHandle, app_state: State<'_, AppState>, language: String) -> Result<(), String> {
+pub async fn set_current_language(
+    app_handle: AppHandle,
+    app_state: State<'_, AppState>,
+    language: String,
+) -> Result<(), String> {
     // Update the tray menu language
-    app_state.update_tray_menu_lang(&app_handle, &language).expect("Failed to update tray menu");
+    app_state
+        .update_tray_menu_lang(&app_handle, &language)
+        .expect("Failed to update tray menu");
 
     let config_path = get_lang_config_path(&app_handle);
     let config = LangConfig { language };
     let content = serde_json::to_string(&config).map_err(|e| e.to_string())?;
-    
+
     // Create directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -96,27 +106,26 @@ pub async fn get_connection_status(
 /// - "device-found" with device details when a device is discovered
 /// - "scan-complete" when scanning is finished
 #[tauri::command]
-pub async fn start_scan(
-    window: Window,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {    
+pub async fn start_scan(window: Window, app_state: State<'_, AppState>) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.start_scan(window).await.map_err(|e| e.to_string())
+
+    bluetooth_manager_guard
+        .start_scan(window)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn stop_scan(
-    window: Window,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {    
+pub async fn stop_scan(window: Window, app_state: State<'_, AppState>) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.stop_scan(window).await.map_err(|e| e.to_string())
-}
 
+    bluetooth_manager_guard
+        .stop_scan(window)
+        .await
+        .map_err(|e| e.to_string())
+}
 
 /// Connects to a Bluetooth device
 ///
@@ -135,8 +144,11 @@ pub async fn connect_to_device(
 
     let mouse_sender_guard = app_state.mouse_sender.lock().await;
     let mouse_sender_clone = mouse_sender_guard.clone();
-    
-    bluetooth_manager_guard.connect_device(window, &device_id, mouse_sender_clone).await.map_err(|e| e.to_string())
+
+    bluetooth_manager_guard
+        .connect_device(window, &device_id, mouse_sender_clone)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -146,8 +158,11 @@ pub async fn reconnect_to_device(
 ) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.reconnect_device(window).await.map_err(|e| e.to_string())
+
+    bluetooth_manager_guard
+        .reconnect_device(window)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -157,8 +172,9 @@ pub async fn get_battery_level(
 ) -> Result<u8, String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.get_battery_level(window)
+
+    bluetooth_manager_guard
+        .get_battery_level(window)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No battery level available".to_string())
@@ -172,16 +188,22 @@ pub async fn get_battery_level(
 pub async fn disconnect(app_state: State<'_, AppState>) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.disconnect().await.map_err(|e| e.to_string())
+
+    bluetooth_manager_guard
+        .disconnect()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn turn_off_controller(app_state: State<'_, AppState>) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    
-    bluetooth_manager_guard.turn_off_controller().await.map_err(|e| e.to_string())
+
+    bluetooth_manager_guard
+        .turn_off_controller()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Starts the magnetometer calibration wizard.
@@ -193,7 +215,10 @@ pub async fn start_mag_calibration_wizard(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
-    bluetooth_manager_guard.start_mag_calibration_wizard(window).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard
+        .start_mag_calibration_wizard(window)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Starts the gyroscope calibration.
@@ -205,7 +230,10 @@ pub async fn start_gyro_calibration(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
-    bluetooth_manager_guard.start_gyro_calibration(window).await.map_err(|e| e.to_string())
+    bluetooth_manager_guard
+        .start_gyro_calibration(window)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Gets the current controller configuration.
@@ -216,7 +244,13 @@ pub async fn get_controller_config(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
-    Ok(bluetooth_manager_guard.notification_handler.get_controller_parser().lock().await.config.clone())
+    Ok(bluetooth_manager_guard
+        .notification_handler
+        .get_controller_parser()
+        .lock()
+        .await
+        .config
+        .clone())
 }
 
 /// Sets the controller configuration.
@@ -228,7 +262,7 @@ pub async fn set_controller_config(
 ) -> Result<(), String> {
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
-    let controller_parser_arc  = bluetooth_manager_guard
+    let controller_parser_arc = bluetooth_manager_guard
         .notification_handler
         .get_controller_parser();
     let mut controller_parser_guard = controller_parser_arc.lock().await;
@@ -237,7 +271,11 @@ pub async fn set_controller_config(
     controller_parser_guard.update_config(config);
 
     // Save the new config to disk
-    if let Err(e) = controller_parser_guard.config.save_config(&app_handle).await {
+    if let Err(e) = controller_parser_guard
+        .config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save controller config: {}", e)
     }
 
@@ -267,7 +305,11 @@ pub async fn reset_controller_config(
     controller_parser_guard.update_config(new_config.clone());
 
     // Save the new config to disk
-    if let Err(e) = controller_parser_guard.config.save_config(&app_handle).await {
+    if let Err(e) = controller_parser_guard
+        .config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save controller config after reset: {}", e);
     }
 
@@ -277,9 +319,7 @@ pub async fn reset_controller_config(
 // --- MouseConfig Commands ---
 
 #[tauri::command]
-pub async fn get_mouse_config(
-    app_state: State<'_, AppState>,
-) -> Result<MouseConfig, String> {
+pub async fn get_mouse_config(app_state: State<'_, AppState>) -> Result<MouseConfig, String> {
     let mouse_sender_arc = app_state.mouse_sender.clone();
     let mouse_sender_guard = mouse_sender_arc.lock().await;
     Ok(mouse_sender_guard.mouse_config.clone())
@@ -296,11 +336,13 @@ pub async fn set_mouse_config(
 
     mouse_sender_guard.mouse_config = config.clone();
 
-    mouse_sender_guard.update_mouse_config(
-        config.clone()
-    ).await;
+    mouse_sender_guard.update_mouse_config(config.clone()).await;
 
-    if let Err(e) = mouse_sender_guard.mouse_config.save_config(&app_handle).await {
+    if let Err(e) = mouse_sender_guard
+        .mouse_config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save mouse config: {}", e);
     }
 
@@ -318,12 +360,15 @@ pub async fn reset_mouse_config(
     let new_config = MouseConfig::default();
     mouse_sender_guard.mouse_config = new_config.clone();
 
-    mouse_sender_guard.update_mouse_config(
-        new_config.clone()
-    ).await;
+    mouse_sender_guard
+        .update_mouse_config(new_config.clone())
+        .await;
 
-
-    if let Err(e) = mouse_sender_guard.mouse_config.save_config(&app_handle).await {
+    if let Err(e) = mouse_sender_guard
+        .mouse_config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save mouse config after reset: {}", e);
     }
 
@@ -333,9 +378,7 @@ pub async fn reset_mouse_config(
 // --- KeymapConfig Commands ---
 
 #[tauri::command]
-pub async fn get_keymap_config(
-    app_state: State<'_, AppState>,
-) -> Result<KeymapConfig, String> {
+pub async fn get_keymap_config(app_state: State<'_, AppState>) -> Result<KeymapConfig, String> {
     let mouse_sender_arc = app_state.mouse_sender.clone();
     let mouse_sender_guard = mouse_sender_arc.lock().await;
     Ok(mouse_sender_guard.keymap_config.clone())
@@ -352,11 +395,15 @@ pub async fn set_keymap_config(
 
     mouse_sender_guard.keymap_config = config.clone();
 
-    mouse_sender_guard.update_keymap_config(
-        config.clone()
-    ).await;
+    mouse_sender_guard
+        .update_keymap_config(config.clone())
+        .await;
 
-    if let Err(e) = mouse_sender_guard.keymap_config.save_config(&app_handle).await {
+    if let Err(e) = mouse_sender_guard
+        .keymap_config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save keymap config: {}", e);
     }
 
@@ -374,17 +421,20 @@ pub async fn reset_keymap_config(
     let new_config = KeymapConfig::default();
     mouse_sender_guard.keymap_config = new_config.clone();
 
-    mouse_sender_guard.update_keymap_config(
-        new_config.clone()
-    ).await;
+    mouse_sender_guard
+        .update_keymap_config(new_config.clone())
+        .await;
 
-    if let Err(e) = mouse_sender_guard.keymap_config.save_config(&app_handle).await {
+    if let Err(e) = mouse_sender_guard
+        .keymap_config
+        .save_config(&app_handle)
+        .await
+    {
         error!("Failed to save keymap config after reset: {}", e);
     }
 
     Ok(new_config)
 }
-
 
 #[macro_export]
 macro_rules! export_commands {

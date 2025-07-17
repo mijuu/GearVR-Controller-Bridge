@@ -1,15 +1,15 @@
 //! Notification handling for the GearVR Controller
 //! This module handles setting up and processing notifications from the controller
 
-use anyhow::{Result};
-use bluest::{Characteristic};
+use anyhow::Result;
+use bluest::Characteristic;
 use futures_util::StreamExt;
 use log::{debug, error, info};
-use std::sync::{Arc};
+use std::sync::Arc;
+use tauri::{Emitter, Window};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tauri::{Window, Emitter};
 
 use crate::core::controller::ControllerParser;
 use crate::mapping::mouse::MouseMapperSender;
@@ -24,9 +24,7 @@ pub struct NotificationHandler {
 
 impl NotificationHandler {
     /// Create a new NotificationHandler
-    pub fn new(
-        controller_parser: Arc<Mutex<ControllerParser>>,
-    ) -> Self {
+    pub fn new(controller_parser: Arc<Mutex<ControllerParser>>) -> Self {
         Self {
             controller_parser,
             cancel_token: Arc::new(CancellationToken::new()),
@@ -58,8 +56,9 @@ impl NotificationHandler {
                 notify_char,
                 controller_parser,
                 mouse_sender,
-                cancel_token
-            ).await
+                cancel_token,
+            )
+            .await
         });
         self.task_handle = Some(handle);
 
@@ -75,7 +74,7 @@ impl NotificationHandler {
         cancel_token: Arc<CancellationToken>,
     ) -> Result<()> {
         info!("Listening for controller notifications...");
-        
+
         match notify_char.notify().await {
             Ok(mut notification_stream) => {
                 loop {
@@ -154,7 +153,7 @@ impl NotificationHandler {
         Ok(())
     }
 
-    pub async  fn stop_notifications(&mut self) -> Result<()> {
+    pub async fn stop_notifications(&mut self) -> Result<()> {
         info!("Stoping last notification.");
         self.cancel_token.cancel();
 
@@ -162,19 +161,20 @@ impl NotificationHandler {
         if let Some(handle) = self.task_handle.take() {
             info!("Waiting for notification to finish...");
             // handle.await 会等待任务完成或被取消，并返回 JoinError 或任务的 Result
-            
+
             match handle.await {
-                Ok(task_result) => {
-                    match task_result {
-                        Ok(_) => info!("Notification finished successfully after cancellation."),
-                        Err(e) => error!("Notification finished with an error: {:?}", e),
-                    }
+                Ok(task_result) => match task_result {
+                    Ok(_) => info!("Notification finished successfully after cancellation."),
+                    Err(e) => error!("Notification finished with an error: {:?}", e),
                 },
                 Err(e) => {
                     if e.is_cancelled() {
                         info!("Notification was cancelled successfully.");
                     } else {
-                        error!("Notification finished with an unexpected join error: {:?}", e);
+                        error!(
+                            "Notification finished with an unexpected join error: {:?}",
+                            e
+                        );
                     }
                 }
             }

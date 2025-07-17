@@ -6,4 +6,4 @@ pub mod controller;
 
 // Re-export commonly used types
 pub use bluetooth::BluetoothManager;
-pub use controller::{ControllerState, ControllerParser};
+pub use controller::{ControllerParser, ControllerState};

@@ -1,22 +1,18 @@
-
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::sync::Arc;
 
-use regex::Regex;
-use anyhow::{Result};
-use futures_util::StreamExt;
+use anyhow::Result;
 use bluest::{Adapter, Device};
-use log::{info, debug, error};
+use futures_util::StreamExt;
+use log::{debug, error, info};
+use regex::Regex;
+use tauri::{Emitter, Window};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tauri::{Window, Emitter};
 
-use crate::core::bluetooth::types::{BluetoothDevice,};
-use crate::core::bluetooth::constants::{
-    CONTROLLER_NAME,
-    MIN_RSSI_THRESHOLD,
-};
+use crate::core::bluetooth::constants::{CONTROLLER_NAME, MIN_RSSI_THRESHOLD};
+use crate::core::bluetooth::types::BluetoothDevice;
 
 pub struct BluetoothScanner {
     adapter: Adapter,
@@ -60,7 +56,8 @@ impl BluetoothScanner {
                 window_for_task,
                 cancel_token_for_task,
                 min_rssi_threshold,
-            ).await;
+            )
+            .await;
             // Reset task handle on scan completion
             {
                 let mut handle_guard = task_handle_clone.lock().await;
@@ -84,9 +81,9 @@ impl BluetoothScanner {
     async fn internal_scan_task(
         adapter: Adapter,
         devices: Arc<Mutex<HashMap<String, Device>>>,
-        window: Window, cancel_token:
-        Arc<CancellationToken>,
-        min_rssi_threshold: i16
+        window: Window,
+        cancel_token: Arc<CancellationToken>,
+        min_rssi_threshold: i16,
     ) -> Result<()> {
         // find connected device first
         info!("Checking for connected devices");
@@ -106,9 +103,8 @@ impl BluetoothScanner {
         info!("No connected Gear VR Controller detected");
 
         info!("Starting bluetooth scan");
-        let mut scan_stream  = adapter.scan(&[]).await?;
+        let mut scan_stream = adapter.scan(&[]).await?;
 
-        
         // Process discovered devices in real-time
         loop {
             tokio::select! {
@@ -117,7 +113,7 @@ impl BluetoothScanner {
                         Some(discovered_device) => {
                             let device = discovered_device.device;
                             let rssi = discovered_device.rssi;
-                            
+
                             // Print all discovered devices for debugging
                             debug!("Found device - Device: {:?}, RSSI: {:?}",  device, rssi);
                             // Only include devices with medium or stronger signal strength
@@ -149,7 +145,7 @@ impl BluetoothScanner {
         Ok(())
     }
 
-    pub async fn stop_scan(&mut self, window: Window, ) -> Result<()> {
+    pub async fn stop_scan(&mut self, window: Window) -> Result<()> {
         info!("Stopping last Bluetooth scan.");
         self.cancel_token.cancel();
 
@@ -163,13 +159,11 @@ impl BluetoothScanner {
         if let Some(handle) = handle_to_await {
             info!("Waiting for scan task to finish...");
             // handle.await 会等待任务完成或被取消，并返回 JoinError 或任务的 Result
-            
+
             match handle.await {
-                Ok(task_result) => {
-                    match task_result {
-                        Ok(_) => info!("Scan task finished successfully after cancellation."),
-                        Err(e) => error!("Scan task finished with an error: {:?}", e),
-                    }
+                Ok(task_result) => match task_result {
+                    Ok(_) => info!("Scan task finished successfully after cancellation."),
+                    Err(e) => error!("Scan task finished with an error: {:?}", e),
                 },
                 Err(e) => {
                     if e.is_cancelled() {
@@ -192,10 +186,10 @@ impl BluetoothScanner {
     /// Emits a device-found event
     async fn emit_device_found(
         window: Window,
-        devices: Arc<Mutex<HashMap<String, Device>>>, 
+        devices: Arc<Mutex<HashMap<String, Device>>>,
         device: Device,
-        rssi: i16
-    ) -> Result<()>{
+        rssi: i16,
+    ) -> Result<()> {
         let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
         let id = device.id().to_string();
         let address = Self::extract_mac_address(&id).unwrap_or_else(|| "N/A".to_string());
@@ -203,12 +197,18 @@ impl BluetoothScanner {
         let is_connected = device.is_connected().await;
         let battery_level = 0;
         let bluetooth_device = BluetoothDevice::new(
-            id.clone(), name.clone(), address.clone(), rssi,
-            battery_level, is_paired, is_connected
+            id.clone(),
+            name.clone(),
+            address.clone(),
+            rssi,
+            battery_level,
+            is_paired,
+            is_connected,
         );
 
-        info!("Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, 
-            Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}", 
+        info!(
+            "Found Gear VR Controller device: Address: {}, ID: {}, Name: {:?}, RSSI: {:?}, 
+            Battery Level: {:?}, Is Paired: {:?}, Is Connected: {:?}",
             address, id, name, rssi, battery_level, is_paired, is_connected
         );
 
@@ -225,12 +225,15 @@ impl BluetoothScanner {
 
     fn extract_mac_address(device_id_str: &str) -> Option<String> {
         let re = Regex::new(r"([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})").unwrap();
-        re.find_iter(device_id_str).last().map(|m| m.as_str().to_string().to_uppercase())
+        re.find_iter(device_id_str)
+            .last()
+            .map(|m| m.as_str().to_string().to_uppercase())
     }
-    
+
     /// Returns true if this device is a GearVR Controller
     fn is_gear_vr_controller(device: &Device) -> bool {
-        device.name()
+        device
+            .name()
             .ok()
             .as_ref()
             .map(|name| name.contains(CONTROLLER_NAME))

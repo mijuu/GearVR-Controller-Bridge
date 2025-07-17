@@ -1,10 +1,10 @@
 use crate::utils::ensure_directory_exists;
-use anyhow::{Result};
+use anyhow::Result;
+use log::{error, info, warn};
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tokio::fs;
-use log::{error, info, warn};
 
 const CONFIG_FILE_NAME: &str = "controller_config.json";
 // 定义磁力计校准参数结构体
@@ -48,7 +48,6 @@ pub struct ControllerConfig {
 
     /// 地区地磁强度 (uT)
     pub local_earth_mag_field: f64,
-
 
     /// 磁力计校准参数
     pub mag_calibration: MagCalibration,
@@ -118,4 +117,3 @@ impl ControllerConfig {
         Ok(())
     }
 }
-

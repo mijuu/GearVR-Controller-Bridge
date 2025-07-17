@@ -8,8 +8,10 @@ use uuid::Uuid;
 pub const CONTROLLER_NAME: &str = "Gear VR Controller";
 
 /// Standard Bluetooth Service UUIDs
-pub const UUID_GENERIC_ACCESS_SERVICE: Uuid = Uuid::from_u128(0x00001800_0000_1000_8000_00805f9b34fb);
-pub const UUID_DEVICE_INFORMATION_SERVICE: Uuid = Uuid::from_u128(0x0000180a_0000_1000_8000_00805f9b34fb);
+pub const UUID_GENERIC_ACCESS_SERVICE: Uuid =
+    Uuid::from_u128(0x00001800_0000_1000_8000_00805f9b34fb);
+pub const UUID_DEVICE_INFORMATION_SERVICE: Uuid =
+    Uuid::from_u128(0x0000180a_0000_1000_8000_00805f9b34fb);
 pub const UUID_BATTERY_SERVICE: Uuid = Uuid::from_u128(0x0000180f_0000_1000_8000_00805f9b34fb);
 
 /// Standard Bluetooth Characteristic UUIDs
@@ -22,10 +24,12 @@ pub const UUID_BATTERY_LEVEL: Uuid = Uuid::from_u128(0x00002a19_0000_1000_8000_0
 pub const UUID_CONTROLLER_SERVICE: Uuid = Uuid::from_u128(0x4f63756c_7573_2054_6872_65656d6f7465);
 
 /// The UUID of the GearVR Controller notification characteristic
-pub const UUID_CONTROLLER_NOTIFY_CHAR: Uuid = Uuid::from_u128(0xc8c51726_81bc_483b_a052_f7a14ea3d281);
+pub const UUID_CONTROLLER_NOTIFY_CHAR: Uuid =
+    Uuid::from_u128(0xc8c51726_81bc_483b_a052_f7a14ea3d281);
 
 /// The UUID of the GearVR Controller write characteristic
-pub const UUID_CONTROLLER_WRITE_CHAR: Uuid = Uuid::from_u128(0xc8c51726_81bc_483b_a052_f7a14ea3d282);
+pub const UUID_CONTROLLER_WRITE_CHAR: Uuid =
+    Uuid::from_u128(0xc8c51726_81bc_483b_a052_f7a14ea3d282);
 
 /// Maximum number of connection retries
 pub const MAX_CONNECT_RETRIES: usize = 5;

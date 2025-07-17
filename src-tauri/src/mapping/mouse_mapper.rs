@@ -51,7 +51,11 @@ pub struct MouseMapper {
 
 impl MouseMapper {
     /// Creates a new mouse mapper with default configuration
-    pub fn new(app_handle: AppHandle, mouse_config: MouseConfig, keymap_config: KeymapConfig) -> Self {
+    pub fn new(
+        app_handle: AppHandle,
+        mouse_config: MouseConfig,
+        keymap_config: KeymapConfig,
+    ) -> Self {
         let enigo = Enigo::new(&Settings::default()).unwrap();
         let (x, y) = enigo.location().unwrap();
         Self {
@@ -320,7 +324,11 @@ impl MouseMapper {
                 }
 
                 // Determine the action for keys and buttons
-                let action_direction = if !modifier_keys.is_empty() { Click } else { Press };
+                let action_direction = if !modifier_keys.is_empty() {
+                    Click
+                } else {
+                    Press
+                };
 
                 // Press action keys
                 for &key in &action_keys {
@@ -519,10 +527,11 @@ impl MouseMapper {
         // If the distance is negligible, snap to the target to prevent jitter.
         if dx.abs() < 1 && dy.abs() < 1 {
             if current_x != self.target_screen_x || current_y != self.target_screen_y {
-                if let Err(e) = self
-                    .enigo
-                    .move_mouse(self.target_screen_x, self.target_screen_y, Coordinate::Abs)
-                {
+                if let Err(e) = self.enigo.move_mouse(
+                    self.target_screen_x,
+                    self.target_screen_y,
+                    Coordinate::Abs,
+                ) {
                     eprintln!("Failed to move mouse to target position: {:?}", e);
                 }
             }

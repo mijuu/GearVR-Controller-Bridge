@@ -1,6 +1,6 @@
 //! Defines shared data structures for the Bluetooth module.
 
-use bluest::{Device, Characteristic};
+use bluest::{Characteristic, Device};
 
 use crate::mapping::mouse::MouseMapperSender;
 
@@ -25,7 +25,15 @@ pub struct BluetoothDevice {
 
 impl BluetoothDevice {
     /// Creates a new BluetoothDevice instance
-    pub fn new(id: String, name: String, address: String, rssi: i16, battery_level: u8, is_paired: bool, is_connected: bool) -> Self {
+    pub fn new(
+        id: String,
+        name: String,
+        address: String,
+        rssi: i16,
+        battery_level: u8,
+        is_paired: bool,
+        is_connected: bool,
+    ) -> Self {
         Self {
             id,
             name,

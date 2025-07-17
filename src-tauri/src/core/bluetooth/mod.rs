@@ -5,16 +5,16 @@
 mod commands;
 mod connection;
 mod constants;
-mod types;
 mod manager;
-mod scanner;
 mod notification;
+mod scanner;
+mod types;
 
 // Re-export types that should be publicly accessible
 pub use commands::{CommandExecutor, CommandSender, ControllerCommand};
 pub use connection::ConnectionManager;
-pub use constants::*;  // Re-export all constants
-pub use types::{BluetoothDevice, ConnectedDeviceState};
+pub use constants::*; // Re-export all constants
 pub use manager::BluetoothManager;
-pub use scanner::BluetoothScanner;
 pub use notification::NotificationHandler;
+pub use scanner::BluetoothScanner;
+pub use types::{BluetoothDevice, ConnectedDeviceState};

@@ -2,7 +2,7 @@
 //! This module contains all the commands that can be sent to the controller
 
 use anyhow::Result;
-use log::{debug, info, error};
+use log::{debug, error, info};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -66,7 +66,9 @@ impl<T: CommandSender> CommandExecutor<T> {
 
     pub async fn turn_off_controller(&self) -> Result<()> {
         info!("Turning off controller");
-        self.command_sender.send_command(ControllerCommand::Off).await?;
+        self.command_sender
+            .send_command(ControllerCommand::Off)
+            .await?;
         Ok(())
     }
 
@@ -74,7 +76,9 @@ impl<T: CommandSender> CommandExecutor<T> {
     pub async fn initialize_controller(&self, vr_mode: bool) -> Result<()> {
         // disable LPM mode for smooth operation
         info!("Disabling LPM mode");
-        self.command_sender.send_command(ControllerCommand::LpmDisable).await?;
+        self.command_sender
+            .send_command(ControllerCommand::LpmDisable)
+            .await?;
         sleep(Duration::from_millis(100)).await;
 
         // Send the appropriate mode command
@@ -87,10 +91,13 @@ impl<T: CommandSender> CommandExecutor<T> {
         };
 
         self.command_sender.send_command(command).await?;
-        
+
         // Wait for command to take effect
         sleep(Duration::from_millis(100)).await;
-        info!("Controller initialized in {} mode", if vr_mode { "VR" } else { "Sensor" });
+        info!(
+            "Controller initialized in {} mode",
+            if vr_mode { "VR" } else { "Sensor" }
+        );
 
         Ok(())
     }
@@ -98,7 +105,9 @@ impl<T: CommandSender> CommandExecutor<T> {
     /// Calibrate the controller
     pub async fn calibrate_controller(&self) -> Result<()> {
         info!("Starting controller calibration");
-        self.command_sender.send_command(ControllerCommand::Calibrate).await?;
+        self.command_sender
+            .send_command(ControllerCommand::Calibrate)
+            .await?;
         sleep(Duration::from_millis(500)).await;
         info!("Controller calibration completed");
         Ok(())
@@ -107,7 +116,9 @@ impl<T: CommandSender> CommandExecutor<T> {
     /// Send a keep-alive signal
     pub async fn send_keepalive(&self) -> Result<()> {
         debug!("Sending keepalive signal");
-        self.command_sender.send_command(ControllerCommand::KeepAlive).await?;
+        self.command_sender
+            .send_command(ControllerCommand::KeepAlive)
+            .await?;
         Ok(())
     }
 
@@ -117,16 +128,22 @@ impl<T: CommandSender> CommandExecutor<T> {
         T: Clone + Send + Sync + 'static,
     {
         let command_sender = self.command_sender.clone();
-        
+
         tokio::spawn(async move {
             loop {
-                if let Err(e) = command_sender.send_command(ControllerCommand::KeepAlive).await {
+                if let Err(e) = command_sender
+                    .send_command(ControllerCommand::KeepAlive)
+                    .await
+                {
                     error!("Failed to send keepalive: {}", e);
                 }
                 sleep(Duration::from_secs(interval_secs)).await;
             }
         });
-        
-        info!("Keepalive timer started with interval of {} seconds", interval_secs);
+
+        info!(
+            "Keepalive timer started with interval of {} seconds",
+            interval_secs
+        );
     }
 }

@@ -1,9 +1,9 @@
 use crate::utils::ensure_directory_exists;
+use anyhow::Result;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
-use anyhow::Result;
 use tokio::fs;
-use log::{error, info, warn};
 
 const CONFIG_FILE_NAME: &str = "keymap_config.json";
 
@@ -45,7 +45,10 @@ impl KeymapConfig {
         let file_path_str = file_path.to_string_lossy().into_owned();
 
         if !file_path.exists() {
-            warn!("Keymap config file not found at {:?}, using default.", file_path_str);
+            warn!(
+                "Keymap config file not found at {:?}, using default.",
+                file_path_str
+            );
             return Ok(Self::default());
         }
 
