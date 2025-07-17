@@ -39,3 +39,6 @@ ahrs = { version = "0.7", features = ["field_access"] }
 nalgebra = { version = "0.33", features = ["serde-serialize"] }
 tokio-util = "0.7.15"
 sys-locale = "0.3.2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"

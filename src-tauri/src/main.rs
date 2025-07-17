@@ -2,16 +2,19 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use gearvr_controller_bridge_lib::{logging, state::AppState, tray};
-use tauri::{
-    Manager, WindowEvent
-};
-use log::{info};
+use log::info;
+use tauri::{Manager, WindowEvent};
 
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main")
+                       .expect("no main window")
+                       .set_focus();
+        }))
         .plugin(tauri_plugin_fs::init())
         // Register our commands
         .invoke_handler(gearvr_controller_bridge_lib::export_commands!())
@@ -24,8 +27,8 @@ fn main() {
                 .map_err(|e| format!("Failed to create Tokio runtime: {}", e))?;
 
             // Create and manage our application state
-            let app_state_instance =
-                rt.block_on(async {
+            let app_state_instance = rt
+                .block_on(async {
                     info!("Starting AppState initialization in Tauri setup.");
                     AppState::new(app.handle()).await
                 })
@@ -50,7 +53,10 @@ fn main() {
                 api.prevent_close();
                 let _ = window.hide();
                 #[cfg(target_os = "macos")]
-                window.app_handle().set_activation_policy(ActivationPolicy::Accessory).unwrap();
+                window
+                    .app_handle()
+                    .set_activation_policy(ActivationPolicy::Accessory)
+                    .unwrap();
             }
             _ => {}
         })

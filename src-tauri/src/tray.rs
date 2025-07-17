@@ -1,17 +1,16 @@
 //! Tray module for handling tray menu internationalization.
 
+use crate::commands;
+use log::error;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
 use tauri::{
+    AppHandle, Manager, State,
     image::Image,
     menu::{Menu, MenuItem},
-    tray::{TrayIcon, TrayIconBuilder},
     path::BaseDirectory,
-    AppHandle, Manager, State,
+    tray::{TrayIcon, TrayIconBuilder},
 };
-use log::error;
-use crate::commands;
 
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
@@ -35,10 +34,14 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
                     let _ = window.show();
                     let _ = window.set_focus();
                     #[cfg(target_os = "macos")]
-                    app.set_activation_policy(ActivationPolicy::Regular).unwrap();
+                    app.set_activation_policy(ActivationPolicy::Regular)
+                        .unwrap();
                 }
             }
             "quit" => {
+                app.remove_tray_by_id(app.state::<TrayIcon>().id())
+                    .expect("Failed to remove tray icon.");
+
                 app.exit(0);
             }
             _ => {}
@@ -60,7 +63,8 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
                         error!("Failed to set tray icon: {}", e);
                     }
                     #[cfg(target_os = "macos")]
-                    tray_state.set_icon_as_template(true)
+                    tray_state
+                        .set_icon_as_template(true)
                         .expect("Failed to set tray icon as template");
                 }
             }
@@ -72,32 +76,43 @@ pub fn create_tray(app_handle: &AppHandle) -> Result<TrayIcon, Box<dyn std::erro
 
 /// Gets the appropriate tray icon based on the current system theme.
 fn get_tray_icon(app_handle: &AppHandle) -> Result<Image<'static>, Box<dyn std::error::Error>> {
+    let path = app_handle.path();
+    let dark_icon = path.resolve("icons/tray-dark.png", BaseDirectory::Resource)?;
+    let light_icon = path.resolve("icons/tray-light.png", BaseDirectory::Resource)?;
+
     let icon_path = if cfg!(target_os = "macos") {
-        PathBuf::from("icons/tray-dark.png")
+        dark_icon
     } else {
-        let window = app_handle.get_webview_window("main").ok_or("Main window not found")?;
+        let window = app_handle
+            .get_webview_window("main")
+            .ok_or("Main window not found")?;
         let theme = window.theme()?;
         match theme {
-            tauri::Theme::Light => PathBuf::from("icons/tray-light.png"),
-            tauri::Theme::Dark => PathBuf::from("icons/tray-dark.png"),
-            _ => PathBuf::from("icons/tray-dark.png"),
+            tauri::Theme::Light => light_icon,
+            tauri::Theme::Dark => dark_icon,
+            _ => dark_icon,
         }
     };
     Image::from_path(icon_path).map_err(|e| e.into())
 }
 
-
 /// Loads and flattens translations from a JSON file.
 pub fn load_translations(app_handle: &AppHandle, lang: &str) -> Option<Translations> {
     let path = app_handle
         .path()
-        .resolve(format!("locales/{}/translation.json", lang), BaseDirectory::Resource)
+        .resolve(
+            format!("locales/{}/translation.json", lang),
+            BaseDirectory::Resource,
+        )
         .ok()?;
     let content = fs::read_to_string(path).ok()?;
     let v: serde_json::Value = match serde_json::from_str(&content) {
         Ok(value) => value,
         Err(e) => {
-            error!("Failed to parse translation file for lang '{}': {}", lang, e);
+            error!(
+                "Failed to parse translation file for lang '{}': {}",
+                lang, e
+            );
             return None;
         }
     };
@@ -125,8 +140,9 @@ pub fn load_translations(app_handle: &AppHandle, lang: &str) -> Option<Translati
 
 /// Update tray menu with new text
 pub fn update_tray_menu(app_handle: &AppHandle, tray: &TrayIcon, lang: &str) -> Result<(), String> {
-    let translations =
-        load_translations(app_handle, lang).or_else(|| load_translations(app_handle, "en")).unwrap_or_default();
+    let translations = load_translations(app_handle, lang)
+        .or_else(|| load_translations(app_handle, "en"))
+        .unwrap_or_default();
 
     let show_text = translations
         .get("trayMenu.show")
@@ -134,9 +150,11 @@ pub fn update_tray_menu(app_handle: &AppHandle, tray: &TrayIcon, lang: &str) -> 
     let quit_text = translations
         .get("trayMenu.quit")
         .map_or("Quit", |s| s.as_str());
-    
-    let show_i = MenuItem::with_id(app_handle, "show", show_text, true, None::<&str>).map_err(|e| e.to_string())?;
-    let quit_i = MenuItem::with_id(app_handle, "quit", quit_text, true, None::<&str>).map_err(|e| e.to_string())?;
+
+    let show_i = MenuItem::with_id(app_handle, "show", show_text, true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let quit_i = MenuItem::with_id(app_handle, "quit", quit_text, true, None::<&str>)
+        .map_err(|e| e.to_string())?;
     let menu = Menu::with_items(app_handle, &[&show_i, &quit_i]).map_err(|e| e.to_string())?;
 
     tray.set_menu(Some(menu)).map_err(|e| e.to_string())
