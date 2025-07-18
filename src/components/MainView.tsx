@@ -26,7 +26,7 @@ const MainView: React.FC = () => {
 
   const searchDevices = useCallback(async () => {
     try {
-      setStatus('searching');        
+      setStatus('searching');
       setError(null);
       await invoke('start_scan');
     } catch (err) {
@@ -57,7 +57,7 @@ const MainView: React.FC = () => {
   }, [t]);
 
   // Start device search on mount
-  useEffect(() => {    
+  useEffect(() => {
     // Listen for device found event
     const deviceFoundUnlisten = listen<BluetoothDevice>('device-found', (event) => {
       // Skip if already found or same device

@@ -187,29 +187,40 @@ impl ConnectionManager {
         let command_sender = BluestCommandSender::new(write_char.clone());
         let command_executor = CommandExecutor::new(command_sender);
 
-        let notify_char_for_task = notify_char.clone();
-
-        // 设置通知监听
-        info!("Setting up notifications...");
-        notification_handler
-            .setup_notifications(window.clone(), notify_char_for_task, mouse_sender)
-            .await?;
-
         info!("Initializing controller in sensor mode...");
         command_executor.initialize_controller(false).await?;
-
+        
         // info!("Starting keepalive timer...");
         // command_executor.start_keepalive_timer(60);
 
-        info!("Connection and setup process completed successfully");
+        // 设置通知监听
+        self.setup_notifications(device, window.clone(), notification_handler, notify_char.clone(), mouse_sender).await?;
+
+        Ok((notify_char, write_char, battery_char))
+    }
+
+    pub async fn setup_notifications(
+        &self,
+        device: &Device,
+        window: Window,
+        notification_handler: &mut NotificationHandler,
+        notify_char: Characteristic,
+        mouse_sender: MouseMapperSender
+    ) -> Result<()> {
+        info!("Setting up notifications...");
+        let device_id = device.id().to_string();
+        let device_name = device.name()?;
+
+        notification_handler.setup_notifications(window.clone(), notify_char, mouse_sender).await?;
+
         let payload = serde_json::json!({
-            "id": id,
-            "name": name,
+            "id": device_id,
+            "name": device_name,
         });
         if let Err(e) = window.emit("device-connected", payload) {
             error!("Failed to emit device-connected event: {}", e);
         }
-        Ok((notify_char, write_char, battery_char))
+        Ok(())
     }
 
     /// Disconnect from the controller (bluest version)

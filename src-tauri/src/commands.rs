@@ -152,7 +152,7 @@ pub async fn connect_to_device(
 }
 
 #[tauri::command]
-pub async fn reconnect_to_device(
+pub async fn reactivate_device(
     window: Window,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -160,7 +160,7 @@ pub async fn reconnect_to_device(
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
     bluetooth_manager_guard
-        .reconnect_device(window)
+        .reactivate_device(window)
         .await
         .map_err(|e| e.to_string())
 }
@@ -202,6 +202,17 @@ pub async fn turn_off_controller(app_state: State<'_, AppState>) -> Result<(), S
 
     bluetooth_manager_guard
         .turn_off_controller()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn initialize_controller(app_state: State<'_, AppState>) -> Result<(), String> {
+    let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
+    let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
+
+    bluetooth_manager_guard
+        .initialize_controller()
         .await
         .map_err(|e| e.to_string())
 }
@@ -443,10 +454,11 @@ macro_rules! export_commands {
             $crate::commands::start_scan,
             $crate::commands::stop_scan,
             $crate::commands::connect_to_device,
-            $crate::commands::reconnect_to_device,
+            $crate::commands::reactivate_device,
             $crate::commands::get_battery_level,
             $crate::commands::disconnect,
             $crate::commands::turn_off_controller,
+            $crate::commands::initialize_controller,
             $crate::commands::start_mag_calibration_wizard,
             $crate::commands::start_gyro_calibration,
             $crate::commands::get_controller_config,
