@@ -256,8 +256,7 @@ pub async fn get_controller_config(
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
     Ok(bluetooth_manager_guard
-        .notification_handler
-        .get_controller_parser()
+        .controller_parser
         .lock()
         .await
         .config
@@ -274,8 +273,8 @@ pub async fn set_controller_config(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     let controller_parser_arc = bluetooth_manager_guard
-        .notification_handler
-        .get_controller_parser();
+        .controller_parser
+        .clone();
     let mut controller_parser_guard = controller_parser_arc.lock().await;
 
     // Update the config and re-initialize components within the parser
@@ -302,8 +301,8 @@ pub async fn reset_controller_config(
     let bluetooth_manager_arc = app_state.bluetooth_manager.clone();
     let bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
     let controller_parser_arc = bluetooth_manager_guard
-        .notification_handler
-        .get_controller_parser();
+        .controller_parser
+        .clone();
     let mut controller_parser_guard = controller_parser_arc.lock().await;
 
     // Create a new default config

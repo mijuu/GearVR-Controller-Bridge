@@ -37,7 +37,9 @@ pub struct BluetoothManager {
     /// Bluetooth scanner
     scanner: BluetoothScanner,
     /// Notification handler
-    pub notification_handler: NotificationHandler,
+    notification_handler: NotificationHandler,
+    /// Controller parser
+    pub controller_parser: Arc<Mutex<ControllerParser>>,
 }
 
 impl BluetoothManager {
@@ -65,6 +67,7 @@ impl BluetoothManager {
             connection_manager,
             scanner,
             notification_handler,
+            controller_parser,
         })
     }
 
@@ -291,8 +294,7 @@ impl BluetoothManager {
         file_path.push(file_name);
 
         // Clear any previously recorded data for mag
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.clear_recorded_data(true, false).await; // Clear only mag data
         drop(controller_parser); // Drop the guard to release the lock
 
@@ -363,8 +365,7 @@ impl BluetoothManager {
         file_path.push(file_name);
 
         // Clear any previously recorded data for gyro
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.clear_recorded_data(false, true).await; // Clear only gyro data
         drop(controller_parser); // Drop the guard to release the lock
 
@@ -408,38 +409,33 @@ impl BluetoothManager {
 
     /// Starts recording sensor data for calibration.
     async fn start_calibration_recording(&self, file_path: &Path) -> Result<()> {
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.start_data_recording(file_path);
         Ok(())
     }
 
     /// Stops recording sensor data for calibration.
     async fn stop_calibration_recording(&self) -> Result<()> {
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.stop_data_recording();
         Ok(())
     }
 
     /// Performs magnetometer calibration using recorded data.
     async fn perform_mag_calibration(&self) -> Result<()> {
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.perform_mag_calibration().await
     }
 
     /// Performs gyroscope calibration using recorded data.
     async fn perform_gyro_calibration(&self) -> Result<()> {
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         controller_parser.perform_gyro_calibration().await
     }
 
     /// Saves the current controller config to a configuration file.
     async fn save_controller_config(&self, window: Window) -> Result<()> {
-        let controller_parser_arc = self.notification_handler.get_controller_parser();
-        let mut controller_parser = controller_parser_arc.lock().await;
+        let mut controller_parser = self.controller_parser.lock().await;
         eprintln!("Saving controller config...");
         // The config is now saved via the ControllerConfig struct
         controller_parser

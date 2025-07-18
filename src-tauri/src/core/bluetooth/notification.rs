@@ -183,9 +183,4 @@ impl NotificationHandler {
         }
         Ok(())
     }
-
-    /// Returns a clone of the Arc<Mutex<ControllerParser>>.
-    pub fn get_controller_parser(&self) -> Arc<Mutex<ControllerParser>> {
-        self.controller_parser.clone()
-    }
 }
