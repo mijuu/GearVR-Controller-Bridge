@@ -28,6 +28,8 @@ use crate::utils::ensure_directory_exists;
 
 /// Manages Bluetooth operations
 pub struct BluetoothManager {
+    /// Bluetooth adapter
+    adapter: Adapter,
     /// Map of device addresses to devices
     devices: Arc<Mutex<HashMap<String, Device>>>,
     /// Currently connected device
@@ -62,6 +64,7 @@ impl BluetoothManager {
         let notification_handler = NotificationHandler::new(controller_parser.clone());
 
         Ok(Self {
+            adapter,
             devices,
             connected_state: Arc::new(Mutex::new(None)),
             connection_manager,
@@ -130,32 +133,68 @@ impl BluetoothManager {
         Ok(())
     }
 
-    /// Reactivate to the last connected device
-    pub async fn reactivate_device(&mut self, window: Window) -> Result<()> {
+    /// Reconnect to the last connected device
+    pub async fn reconnect_device(&mut self, window: Window) -> Result<()> {
         let connected_state = {
             let connected_state_guard = self.connected_state.lock().await;
             connected_state_guard
                 .clone()
                 .ok_or_else(|| anyhow!("No device connected"))?
         };
-
-        let device = connected_state.device;
         
-        if device.is_connected().await {
-            self.initialize_controller().await?;
-            let notify_char = connected_state.notify_characteristic;
-            let mouse_sender = connected_state.mouse_sender;
-            
-            self.connection_manager.setup_notifications(
-                &device,
-                window,
-                &mut self.notification_handler,
-                notify_char,
-                mouse_sender
-            ).await?;
-            Ok(())
+        if cfg!(target_os = "windows") {
+            let device = connected_state.device.clone();
+            if device.is_connected().await {
+                self.initialize_controller().await?;
+                let notify_char = connected_state.notify_characteristic;
+                let mouse_sender = connected_state.mouse_sender;
+                
+                self.connection_manager.setup_notifications(
+                    &device,
+                    window,
+                    &mut self.notification_handler,
+                    notify_char,
+                    mouse_sender
+                ).await?;
+                Ok(())
+            } else {
+                Err(anyhow!("Device not connected"))
+            }
         } else {
-            Err(anyhow!("Device not connected"))
+            let last_device_id = connected_state.device.id();
+            let mouse_sender = connected_state.mouse_sender;
+
+            info!("Attempting to reconnect to device {}", &last_device_id);
+            let device = self.adapter.open_device(&last_device_id).await?;
+
+            // Connect to the device with retry mechanism
+            let (notify_char, write_char, battery_char) = self
+                .connection_manager
+                .try_connect(
+                    &device,
+                    &window,
+                    &mut self.notification_handler,
+                    mouse_sender.clone(),
+                    UUID_CONTROLLER_SERVICE,
+                    UUID_BATTERY_SERVICE,
+                    UUID_CONTROLLER_NOTIFY_CHAR,
+                    UUID_CONTROLLER_WRITE_CHAR,
+                    UUID_BATTERY_LEVEL,
+                )
+                .await?;
+
+            let state = ConnectedDeviceState {
+                device: device.clone(),
+                mouse_sender,
+                notify_characteristic: notify_char,
+                write_characteristic: write_char,
+                battery_characteristic: battery_char,
+            };
+            // If connection successful, store the connected device
+            *self.connected_state.lock().await = Some(state);
+
+            info!("Device successfully reconnected and state stored in the main service.");
+            Ok(())
         }
     }
 

@@ -91,20 +91,19 @@ function App() {
       
       stopReconnecting(); // Clear any previous loop
 
-      const tryReactivate = async () => {
-          console.log("Checking if device is still connected...");
-          const status = await invoke<{ is_connected: boolean, device_name: string | null }>('get_connection_status');
-          if (status.is_connected) {
-              await invoke('reactivate_device');
-              return;
-          } else {
+      const tryReconnect = async () => {
+          try {
+              await invoke('reconnect_device');
+          } catch (err) {
+              console.error("Failed to reconnect to device:", err);
+              // If the device is still not connected, try again after 3 seconds.
               // If the attempt fails, schedule the next one.
-              reconnectTimeoutRef.current = setTimeout(tryReactivate, 3000);
+              reconnectTimeoutRef.current = setTimeout(tryReconnect, 3000);
           }
       };
 
       // Start the first attempt.
-      tryReactivate();
+      tryReconnect();
     });
 
     const unlistenError = listen("device-error", (event) => {

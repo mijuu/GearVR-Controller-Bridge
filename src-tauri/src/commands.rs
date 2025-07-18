@@ -152,7 +152,7 @@ pub async fn connect_to_device(
 }
 
 #[tauri::command]
-pub async fn reactivate_device(
+pub async fn reconnect_device(
     window: Window,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -160,7 +160,7 @@ pub async fn reactivate_device(
     let mut bluetooth_manager_guard = bluetooth_manager_arc.lock().await;
 
     bluetooth_manager_guard
-        .reactivate_device(window)
+        .reconnect_device(window)
         .await
         .map_err(|e| e.to_string())
 }
@@ -453,7 +453,7 @@ macro_rules! export_commands {
             $crate::commands::start_scan,
             $crate::commands::stop_scan,
             $crate::commands::connect_to_device,
-            $crate::commands::reactivate_device,
+            $crate::commands::reconnect_device,
             $crate::commands::get_battery_level,
             $crate::commands::disconnect,
             $crate::commands::turn_off_controller,
