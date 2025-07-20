@@ -1,9 +1,9 @@
 # GearVR Controller Bridge
 
 <div>一个使用三星 Gear VR 控制器来模拟鼠标和键盘输入的工具。</div>
-<img src="./assets/scan.png" width="30%"/>
-<img src="./assets/main.png" width="30%"/>
-<img src="./assets/setting.png" width="30%"/>
+<img src="./assets/scan.png"/>
+<img src="./assets/main.png"/>
+<img src="./assets/setting.png"/>
 
 ## 功能
 
@@ -24,6 +24,12 @@
 *   Windows 10 及更高版本
 *   macOS
 
+**macOS 用户请注意：** 如果您看到提示“应用已损坏，无法打开”，您可能需要在终端中运行以下命令：
+```bash
+xattr -cr "/Applications/GearVR Controller Bridge.app"
+```
+这是因为该应用程序没有签名。
+
 ## 如何使用
 
 1.  确保您的电脑蓝牙已开启。
@@ -32,7 +38,7 @@
 4.  应用会自动搜索，并连接控制器。
 5.  连接成功后，您就可以开始使用控制器来控制您的电脑了。
 6.  首次使用时，请在“设置”页面校准磁力计和陀螺仪。
-6.  在“设置”页面，您可以自定义按键映射和鼠标灵敏度等。
+7.  在“设置”页面，您可以自定义按键映射和鼠标灵敏度等。
 
 ## 感谢
 

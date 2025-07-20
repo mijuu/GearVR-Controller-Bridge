@@ -1,9 +1,9 @@
 # GearVR Controller Bridge
 
 <div>A tool that uses the Samsung Gear VR controller to simulate mouse and keyboard input.</div>
-<img src="./assets/scan.png" width="30%"/>
-<img src="./assets/main.png" width="30%"/>
-<img src="./assets/setting.png" width="30%"/>
+<img src="./assets/scan.png"/>
+<img src="./assets/main.png"/>
+<img src="./assets/setting.png"/>
 
 ## Features
 
@@ -23,6 +23,12 @@
 
 *   Windows 10 and later
 *   macOS
+
+**Note for macOS users:** If you see a message saying the app "is damaged and can’t be opened", you may need to run the following command in the terminal:
+```bash
+xattr -cr "/Applications/GearVR Controller Bridge.app"
+```
+This is because the application is not signed.
 
 ## How to Use
 
